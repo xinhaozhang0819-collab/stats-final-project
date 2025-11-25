@@ -1,0 +1,534 @@
+---
+title: "Statistical Analysis Project Proposal"
+subtitle: "Modeling and Data Representations - STA 702"
+author: "Diwas Puri, Xinhao Zhang, Tea Tafaj, Tony Ngari"
+format: 
+  pdf:
+    documentclass: article
+    geometry: margin=1in
+    fontsize: 11pt
+date: today
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, 
+                      fig.width = 8, fig.height = 5)
+```
+
+```{r load-packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(ggplot2)
+theme_set(theme_minimal(base_size = 12))
+```
+
+# Dataset Options
+
+## Dataset 1 (Top Choice): Bots vs Users Classification
+
+### Source and Description
+
+**Source:** Kaggle - "Users vs Bots Classification" dataset by juice0lover
+
+**Original Collection:** This dataset was collected from VKontakte (VK), a Russian online social media and social networking service. The data was gathered to distinguish between genuine user accounts and automated bot accounts on the platform.
+
+**Data Collection Method:** The dataset contains behavioral and profile features extracted from VK user accounts. Features include profile completeness metrics, social engagement statistics, posting behavior patterns, and various account characteristics.
+
+**Observation Unit:** Each row represents a single VK social media account (either a genuine user or a bot), with 59 features describing the account's characteristics and behavior patterns.
+
+**Citation:** juice0lover. (2024). Users vs Bots Classification. Kaggle. https://www.kaggle.com/datasets/juice0lover/users-vs-bots-classification
+
+### Research Questions
+
+**Research Question 1 (Binary Outcome):** *How do account activity patterns (subscriber count, posting visibility, and audio availability) relate to the likelihood of an account being a bot versus a genuine user, and does the effect of subscriber count on bot classification differ based on whether posts are visible?*
+
+-   **Outcome Variable:** `target` (binary: 0 = User, 1 = Bot)
+-   **Primary Independent Variables:** `subscribers_count`, `all_posts_visible`, `audio_available`
+-   **Interaction Term:** `subscribers_count * all_posts_visible`
+-   **Inference Focus:** Understanding how profile visibility and engagement features are associated with bot behavior patterns
+
+**Research Question 2 (Count Outcome):** *What factors are associated with the number of subscribers an account has, and does the relationship between having a profile status and subscriber count differ based on gender?*
+
+-   **Outcome Variable:** `subscribers_count` (count variable)
+-   **Primary Independent Variables:** `has_status`, `gender`, `has_website`, `audio_available`
+-   **Interaction Term:** `has_status * gender`
+-   **Inference Focus:** Understanding which profile features are associated with higher social engagement (subscriber counts)
+
+### Data Glimpse
+
+```{r load-dataset1, message=FALSE}
+# Load the cleaned dataset
+bots_data <- read_csv("bots_vs_users_cleaned_15vars.csv")
+
+# Display structure and glimpse
+glimpse(bots_data)
+```
+
+```{r dataset1-summary}
+# Summary statistics
+summary(bots_data)
+```
+
+### Exploratory Data Analysis
+
+#### Research Question 1: Bot Classification (Binary Outcome)
+
+```{r rq1-outcome-plot, fig.cap="Distribution of Target Variable (Bot vs User)"}
+# Plot outcome variable distribution
+ggplot(bots_data, aes(x = factor(target, labels = c("User", "Bot")), 
+                       fill = factor(target))) +
+  geom_bar(stat = "count", color = "black") +
+  geom_text(stat = "count", aes(label = after_stat(count)), 
+            vjust = -0.5, size = 4) +
+  scale_fill_manual(values = c("User" = "#2ecc71", "Bot" = "#e74c3c")) +
+  labs(title = "Distribution of Account Types",
+       x = "Account Type",
+       y = "Count",
+       fill = "Account Type") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+```
+
+```{r rq1-exploratory-plots, fig.width=10, fig.height=6}
+# Create exploratory plots for primary relationships
+library(gridExtra)
+
+# Plot 1: Subscribers count by target
+p1 <- ggplot(bots_data, aes(x = factor(target, labels = c("User", "Bot")), 
+                             y = subscribers_count, 
+                             fill = factor(target))) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("User" = "#2ecc71", "Bot" = "#e74c3c")) +
+  labs(title = "Subscriber Count by Account Type",
+       x = "Account Type",
+       y = "Subscriber Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Plot 2: Posts visibility vs target
+p2 <- ggplot(bots_data, aes(x = factor(all_posts_visible), 
+                             fill = factor(target, labels = c("User", "Bot")))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("User" = "#2ecc71", "Bot" = "#e74c3c")) +
+  labs(title = "Account Type by Post Visibility",
+       x = "All Posts Visible",
+       y = "Proportion",
+       fill = "Account Type") +
+  theme_minimal()
+
+# Plot 3: Audio availability vs target
+p3 <- ggplot(bots_data, aes(x = factor(audio_available), 
+                             fill = factor(target, labels = c("User", "Bot")))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("User" = "#2ecc71", "Bot" = "#e74c3c")) +
+  labs(title = "Account Type by Audio Availability",
+       x = "Audio Available",
+       y = "Proportion",
+       fill = "Account Type") +
+  theme_minimal()
+
+# Plot 4: Interaction effect - subscribers by visibility and target
+p4 <- ggplot(bots_data, aes(x = subscribers_count, 
+                             fill = factor(target, labels = c("User", "Bot")))) +
+  geom_density(alpha = 0.6) +
+  facet_wrap(~factor(all_posts_visible, labels = c("Not Visible", "Visible"))) +
+  scale_fill_manual(values = c("User" = "#2ecc71", "Bot" = "#e74c3c")) +
+  labs(title = "Subscriber Distribution by Post Visibility (Interaction Effect)",
+       x = "Subscriber Count",
+       y = "Density",
+       fill = "Account Type") +
+  theme_minimal() +
+  xlim(0, quantile(bots_data$subscribers_count, 0.95, na.rm = TRUE))
+
+# Arrange plots
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+#### Research Question 2: Subscriber Count (Count Outcome)
+
+```{r rq2-outcome-plot, fig.cap="Distribution of Subscriber Count"}
+# Plot outcome variable distribution
+ggplot(bots_data, aes(x = subscribers_count)) +
+  geom_histogram(bins = 50, fill = "#3498db", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Subscriber Count",
+       x = "Subscriber Count",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  xlim(0, quantile(bots_data$subscribers_count, 0.95, na.rm = TRUE))
+```
+
+```{r rq2-exploratory-plots, fig.width=10, fig.height=6}
+# Create exploratory plots for primary relationships
+
+# Plot 1: Subscriber count by status
+p5 <- ggplot(bots_data, aes(x = factor(has_status), 
+                             y = subscribers_count,
+                             fill = factor(has_status))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Subscriber Count by Status Presence",
+       x = "Has Status",
+       y = "Subscriber Count") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ylim(0, quantile(bots_data$subscribers_count, 0.95, na.rm = TRUE))
+
+# Plot 2: Subscriber count by gender
+p6 <- ggplot(bots_data, aes(x = factor(gender), 
+                             y = subscribers_count,
+                             fill = factor(gender))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Subscriber Count by Gender",
+       x = "Gender",
+       y = "Subscriber Count") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ylim(0, quantile(bots_data$subscribers_count, 0.95, na.rm = TRUE))
+
+# Plot 3: Subscriber count by website
+p7 <- ggplot(bots_data, aes(x = factor(has_website), 
+                             y = subscribers_count,
+                             fill = factor(has_website))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title = "Subscriber Count by Website Presence",
+       x = "Has Website",
+       y = "Subscriber Count") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ylim(0, quantile(bots_data$subscribers_count, 0.95, na.rm = TRUE))
+
+# Plot 4: Interaction effect - status and gender
+# Filter out any NA values in gender to avoid palette issues
+bots_data_filtered <- bots_data %>% filter(!is.na(gender))
+
+p8 <- ggplot(bots_data_filtered, aes(x = factor(has_status), 
+                                      y = subscribers_count,
+                                      fill = factor(gender))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Interaction: Status and Gender on Subscriber Count",
+       x = "Has Status",
+       y = "Subscriber Count",
+       fill = "Gender") +
+  theme_minimal() +
+  ylim(0, quantile(bots_data_filtered$subscribers_count, 0.95, na.rm = TRUE))
+
+# Arrange plots
+grid.arrange(p5, p6, p7, p8, ncol = 2)
+```
+
+## Dataset 2: U.S. County-Level Presidential Election Turnout + County Income
+
+**Data source:**
+
+-   MIT Election Data and Science Lab - *County Presidential Election Returns 2000–2020*.
+
+Observational unit: Each row represents one county–year–candidate observation in a U.S. presidential election. For each candidate in each county and each election year, we observe the number of votes they received and the total number of votes cast in that county.
+
+-   ERS- county-level median household income and unemployment.
+
+Observational unit: Each row represents one county (with a FIPS code) in a given year, with associated population estimates.
+
+**Brief description:** we propose analyzing county-level U.S. presidential election results merged with county-level socioeconomic indicators. In the final project, we plan to extend this by merging in additional county-level economic indicators (e.g., unemployment, median household income) from Census / ACS or BEA, but for the proposal and initial exploratory analysis we focus on:
+
+-   Constructing turnout rates from the election data, and
+
+-   Using population estimates and basic county characteristics as a starting point for economic context.
+
+**Research question 1:** How does local economic downturn relate to voter turnout in U.S. presidential elections at the county level?
+
+-   Outcome variable (include the name/description and type of variable):
+
+    Turnout_rate = total votes cast / estimated voting-eligible population for each county–election year. Continuous variable.
+
+-   Planned interaction term:
+
+    -   Economic downturn × Urban/rural classification (or × region)\
+        This allows us to test whether the effect of economic distress on turnout differs systematically across different types of counties.
+
+**Research question 2:** Does local economic downturn affect the probability that a county supports the incumbent presidential party?
+
+-   Outcome variable: incumbent_win =1 if the county's vote share is higher for the incumbent party's candidate, otherwise 0. Binary
+-   Planned interaction term:
+    -   Economic downturn × Education levels (or × racial composition).\
+        This will allow us to test whether the political response to economic hardship is heterogeneous across counties with different sociodemographic profiles.
+
+**Load the data and provide a `glimpse()`**: As we are working with three separate datasets for this exercise, some merging and "slight" cleaning is presented below for meaningful charts.
+
+```{r data-2, warning=FALSE}
+election_url <- "https://raw.githubusercontent.com/ctesta01/covid.gradient.estimation/main/inst/mit_election_lab/countypres_2000-2020.csv"
+elections_raw <- read_csv(election_url, show_col_types = FALSE)
+glimpse(elections_raw)
+```
+
+```{r}
+url_income <- "https://ers.usda.gov/sites/default/files/_laserfiche/DataFiles/48747/Unemployment2023.csv?v=74671"
+income_raw <- readr::read_csv(url_income, show_col_types = FALSE)
+
+
+url_pop <- "https://ers.usda.gov/sites/default/files/_laserfiche/DataFiles/48747/PopulationEstimates.csv?v=94206"
+pop_raw <- readr::read_csv(url_pop, show_col_types = FALSE)
+
+```
+
+```{r}
+glimpse(income_raw)
+```
+
+```{r}
+glimpse(pop_raw)
+```
+
+```{r}
+#clean dataset income
+
+income_clean <- income_raw %>%
+  filter(FIPS_Code >= 1000) %>%  # remove national/state totals
+  mutate(
+    FIPS_Code = sprintf("%05d", as.integer(FIPS_Code))
+  ) %>%
+  separate(Attribute, into = c("attribute_name", "year"), sep = "_(?=\\d{4})") %>%
+  mutate(year = as.integer(year)) %>%
+  pivot_wider(
+    names_from = attribute_name,
+    values_from = Value
+  )
+
+```
+
+```{r}
+#clean dataset population
+
+pop_clean <- pop_raw %>%
+  filter(FIPStxt >= 1000) %>%
+  mutate(
+    FIPS = sprintf("%05d", as.integer(FIPStxt))
+  ) %>%
+  separate(Attribute, into = c("attribute_name", "year"), sep = "_(?=\\d{4})") %>%
+  mutate(year = as.integer(year)) %>%
+  pivot_wider(
+    names_from = attribute_name,
+    values_from = Value
+  )
+
+```
+
+```{r}
+#FIltering the dataset election for the project proposal purposes, currently looking only at 2020 to demonstrate approach.
+
+elections_clean <- elections_raw %>%
+  filter(office == "US PRESIDENT") %>%   
+  filter(!is.na(county_fips)) %>%
+  mutate(county_fips = sprintf("%05d", as.integer(county_fips)))
+
+elections_2020 <- elections_clean %>%
+  filter(year == 2020)
+
+county_2020 <- elections_2020 %>%
+  group_by(county_fips, state_po, county_name) %>%
+  summarise(
+    totalvotes = max(totalvotes, na.rm = TRUE),
+    dem_votes  = sum(if_else(party == "DEMOCRAT", candidatevotes, 0L)),
+    rep_votes  = sum(if_else(party == "REPUBLICAN", candidatevotes, 0L)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    rep_share = rep_votes / totalvotes,
+    winner_party = case_when(
+      dem_votes > rep_votes ~ "DEMOCRAT",
+      rep_votes > dem_votes ~ "REPUBLICAN",
+      TRUE ~ "OTHER"
+    ),
+    incumbent_win = if_else(winner_party == "REPUBLICAN", 1, 0)
+  )
+
+glimpse(county_2020)
+
+```
+
+```{r}
+#merge datasets only at 2020 values:
+
+
+income_2020 <- income_raw %>%
+  filter(
+    FIPS_Code >= 1000,                      # drop national / state totals
+    Attribute == "Unemployment_rate_2020"   # keep only 2020 unemployment rate
+  ) %>%
+  mutate(
+    county_fips = sprintf("%05d", as.integer(FIPS_Code))
+  ) %>%
+  select(county_fips, unemployment_rate_2020 = Value)
+
+# Merge into your county_2020 election data
+county_2020_full <- county_2020 %>%
+  left_join(income_2020, by = "county_fips")
+
+glimpse(county_2020_full)
+
+```
+
+```{r}
+#population 2020 to match the example election data for Project proposal
+
+pop_2020 <- pop_raw %>%
+  filter(
+    FIPStxt >= 1000,                        # keep county rows
+    Attribute == "POP_ESTIMATE_2020"        # keep 2020 population estimate
+  ) %>%
+  mutate(
+    county_fips = sprintf("%05d", as.integer(FIPStxt))
+  ) %>%
+  select(county_fips, population_2020 = Value)
+
+glimpse(pop_2020)
+
+```
+
+```{r}
+#merge pop_2020 with county for turnout rates
+county_2020_full <- left_join(county_2020_full, pop_2020, by = "county_fips")
+
+glimpse(county_2020_full)
+
+
+
+```
+
+```{r}
+county_2020_full <- county_2020_full %>%
+  mutate(
+    turnout_rate = totalvotes / population_2020
+  )
+
+glimpse(county_2020_full)
+
+```
+
+```{r}
+county_2020_full$turnout_rate[county_2020_full$turnout_rate > 1] <- NA
+
+```
+
+**\
+Exploratory Plots: For reference we are currently only looking at 2020. For the Final Project the analysis will include 2000, 2004, 2008, 2012, 2016 and 2020.**
+
+```{r plots-2}
+
+county_2020_full %>%
+  ggplot(aes(x = unemployment_rate_2020, y = turnout_rate)) +
+  geom_point(alpha = 0.3, color = "#3182bd") +
+  geom_smooth(method = "lm", se = TRUE, color = "#31a354", linewidth = 1.1) +
+  labs(
+    title = "Relationship Between Unemployment Rate and Voter Turnout (2020)",
+    subtitle = "County-level data (Population Estimate used as denominator)",
+    x = "Unemployment Rate (%)",
+    y = "Turnout Rate",
+    caption = "Source: MIT Election Lab & USDA ERS"
+  )
+
+
+#The datasets will need further work to be cleaned, a deeper dive into populations is needed to provide turnout rates that are indeed actual voters/possible voters. the latter is currently affected by the inclusion of citizens that are unable to vote due to age or other constrictions (disability/prison etc). For the purposes of this exploration we momentarily drop turnout rates higher than 1.
+
+
+
+```
+
+```{r}
+
+county_2020_full %>%
+  mutate(
+    unemp_bin = cut(
+      unemployment_rate_2020,
+      breaks = c(0, 3, 5, 7, 9, 100),
+      labels = c("0–3%", "3–5%", "5–7%", "7–9%", "9%+")
+    )
+  ) %>%
+  group_by(unemp_bin) %>%
+  summarise(
+    avg_turnout = mean(turnout_rate, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(x = unemp_bin, y = avg_turnout, fill = unemp_bin)) +
+  geom_col(color = "white") +
+  scale_fill_brewer(palette = "Blues") +
+  labs(
+    title = "Average Turnout by Unemployment Category (2020)",
+    x = "Unemployment Category",
+    y = "Average Turnout Rate"
+  )
+
+```
+
+```{r}
+county_2020_full %>%
+  mutate(
+    incumbent_win = factor(
+      incumbent_win,
+      levels = c(1, 0),
+      labels = c("Incumbent Wins", "Incumbent Loses")
+    )
+  ) %>%
+  ggplot(aes(x = incumbent_win, fill = incumbent_win)) +
+  geom_bar(color = "white") +
+  scale_fill_manual(values = c("#31a354", "#e34a33")) +
+  labs(
+    title = "Incumbent (Republican) Wins vs. Losses by County (2020)",
+    x = "",
+    y = "Number of Counties",
+    fill = ""
+  )
+```
+
+```{r}
+county_2020_full %>%
+  mutate(
+    incumbent_win = factor(
+      incumbent_win,
+      levels = c(1, 0),
+      labels = c("Incumbent Wins", "Incumbent Loses")
+    )
+  ) %>%
+  ggplot(aes(x = incumbent_win, y = unemployment_rate_2020, fill = incumbent_win)) +
+  geom_boxplot(alpha = 0.8, color = "white") +
+  scale_fill_manual(values = c("#31a354", "#e34a33")) +
+  labs(
+    title = "County Unemployment Rate by Incumbent Win/Loss (2020)",
+    x = "",
+    y = "Unemployment Rate (%)",
+    fill = ""
+  )
+```
+
+\newpage
+
+# Team Charter
+
+**When will you meet as a team to work on the project components? Will these meetings be held in person or virtually?**
+
+-   I will meet virtually (through **ZOOM** or **Google Meet**) once or twice a week. When approaching the deadline, we will meet every 2-3 days.
+
+**What is your group policy on missing team meetings (e.g., how much advance notice should be provided)?**
+
+-   If a member cannot attend a meeting, he/she should send message to the group chats at least 2 hours before the meeting.
+
+**How will your team communicate (email, Slack, text messages)? What is your policy on appropriate response time (within a certain number of hours? Nights/weekends?)?**
+
+-   We will use Whatsapp to communicate
+
+-   An appropriate response should be within 24 hours (48 hours for weekends). No response needed during nights.
+
+## References
+
+-   juice0lover. (2024). Users vs Bots Classification.
+
+    Kaggle: https://www.kaggle.com/datasets/juice0lover/users-vs-bots-classification
+
+-   Chawla, N. V., Bowyer, K. W., Hall, L. O., & Kegelmeyer, W. P. (2002). SMOTE: Synthetic minority over-sampling technique. *Journal of Artificial Intelligence Research*, 16, 321-357.
