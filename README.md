@@ -58,6 +58,8 @@ graph TD
     H[Economic Data] -->|Merge| G
     I[MIT Election Data] -->|Merge| G
     G -->|Analysis| J[Statistical Models]
+```
+
 ## Data Citation
 
 **National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022 (ICPSR 38506)**
