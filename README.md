@@ -6,24 +6,6 @@ This project investigates the relationship between economic indicators (unemploy
 
 ```
 ├── data/
-│   ├── raw/            # Original datasets (ICPSR_38506-V2.zip)
-│   ├── processed/      # Cleaned data (voting_population_cleaned.parquet)
-│   └── output/         # Model results and final tables
-├── notebooks/          # Jupyter notebooks for analysis
-│   ├── Preprocess_VotingPop.ipynb
-│   └── Project_Proposal.qmd
-├── plots/              # Generated EDA visualizations
-│   ├── voter_turnout_trends.png
-│   ├── partisan_index_trends.png
-│   ├── turnout_distribution.png
-│   └── correlation_heatmap.png
-└── scripts/            # Helper Python scripts
-```
-
-## Milestones & Progress
-
-### ✅ Milestone 1: Data Acquisition & Preprocessing (Completed)
-- [x] **Voting Population Data:** Loaded raw ICPSR data, cleaned missing values, converted types.
 - [x] **FIPS Standardization:** Extracted and formatted State/County FIPS codes for merging.
 - [x] **Data Export:** Saved cleaned dataset as optimized Parquet file (`voting_population_cleaned.parquet`).
 
