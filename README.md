@@ -13,10 +13,10 @@ This project investigates the relationship between economic indicators (unemploy
 │   ├── Preprocess_VotingPop.ipynb
 │   └── Project_Proposal.qmd
 ├── plots/              # Generated EDA visualizations
-│   ├── voter_turnout_trends.png
-│   ├── partisan_index_trends.png
-│   ├── turnout_distribution.png
-│   └── correlation_heatmap.png
+    ├── voter_turnout_trends.png
+    ├── partisan_index_trends.png
+    ├── turnout_distribution.png
+    └── correlation_heatmap.png
 
 ```
 
@@ -58,4 +58,8 @@ graph TD
     H[Economic Data] -->|Merge| G
     I[MIT Election Data] -->|Merge| G
     G -->|Analysis| J[Statistical Models]
-```
+## Data Citation
+
+**National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022 (ICPSR 38506)**
+
+> Clary, Will, Gomez-Lopez, Iris N., Chenoweth, Megan, Gypin, Lindsay, Clarke, Philippa, Noppert, Grace, Li, Mao, and Kollman, Ken. National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022. Ann Arbor, MI: Inter-university Consortium for Political and Social Research [distributor], 2024-10-14. https://doi.org/10.3886/ICPSR38506.v2
