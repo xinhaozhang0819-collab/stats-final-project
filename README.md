@@ -42,9 +42,18 @@ This project investigates the relationship between economic indicators (unemploy
 - [ ] **Hypothesis Testing:** Test if economic distress shifts partisan preference.
 - [ ] **Final Report:** Summarize findings in Quarto/PDF format.
 
+## Data Notes
+
+### Negative Values in Voter Turnout
+During data inspection, negative values (`-1.0`) were observed in the `REG_VOTER_TURNOUT_PCT` column.
+- **North Dakota (State FIPS 38):** Accounts for the majority of these cases (477 rows). North Dakota does not have voter registration, so this metric is inapplicable.
+- **Other States:** Illinois, South Carolina, and Mississippi also contain some `-1.0` values, likely indicating missing data.
+- **Recommendation:** Filter out these values or treat them as `NaN` during analysis.
+
 ## Usage
 1. **Setup:** Ensure `data/raw` contains the source zip file.
 2. **Preprocess:** Run `notebooks/Preprocess_VotingPop.ipynb` to generate cleaned data.
+
 ## Data Pipeline Workflow
 
 ```mermaid
