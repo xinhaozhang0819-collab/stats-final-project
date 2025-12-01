@@ -1,0 +1,449 @@
+---
+title: "Data Processing"
+format: pdf
+editor: visual
+---
+
+## IDS 702: Final Project FALL 2025
+
+## Statistical Analysis of Election Outcomes in the USA, 2000-2024
+
+## **Economic Data Processing**
+
+This script reduces dimensionality of the previously downloaded raw ACS data, to make it easier to work with in the upcoming analyis.
+
+------------------------------------------------------------------------
+
+## **Block 1: Setup and Loading Data**.
+
+```{r}
+library(tidyverse)
+library(here)
+
+# Load the raw Census data
+census_raw <- read_csv("census_economic_data_raw.csv", show_col_types = FALSE)
+
+# Quick overview
+cat("Original data dimensions:", nrow(census_raw), "rows x", ncol(census_raw), "columns\n")
+cat("Year range:", min(census_raw$year), "-", max(census_raw$year), "\n")
+cat("Number of states:", n_distinct(census_raw$NAME), "\n")
+```
+
+------------------------------------------------------------------------
+
+## Block 2: Income Classification
+
+**What this block does:**
+
+\- Takes 14 separate income brackets
+
+\- Creates 6 income bands
+
+\- Each band is a percentage of total households
+
+\- Converts raw counts into percentages (easier to compare across states)
+
+**The 6 bands:**
+
+\- Lower income: \<\$35k (combines 6 brackets: under \$10k through \$30-35k)
+
+\- Lower-middle: \$35k-\$60k (combines 4 brackets)
+
+\- Middle: \$60k-\$100k (combines 2 brackets)
+
+\- Upper-middle: \$100k-\$150k (combines 2 brackets)
+
+\- Upper: \$150k-\$200k (1 bracket)
+
+\- Super-upper: \$200k+ (1 bracket)
+
+```{r}
+# Calculate income band percentages
+census_income <- census_raw %>%
+  mutate(
+    # First, calculate total households by summing all income brackets
+    total_hh = income_under_10kE + income_10k_15kE + income_15k_20kE + 
+               income_20k_25kE + income_25k_30kE + income_30k_35kE +
+               income_35k_40kE + income_40k_45kE + income_45k_50kE +
+               income_50k_60kE + income_60k_75kE + income_75k_100kE +
+               income_100k_125kE + income_125k_150kE + income_150k_200kE +
+               income_200k_plusE,
+    
+    # Lower income: Under $35k (sum first 6 brackets)
+    lower_income_hh = income_under_10kE + income_10k_15kE + income_15k_20kE + 
+                      income_20k_25kE + income_25k_30kE + income_30k_35kE,
+    lower_income_pct = (lower_income_hh / total_hh) * 100,
+    
+    # Lower-middle income: $35k-$60k (sum next 4 brackets)
+    lower_middle_income_hh = income_35k_40kE + income_40k_45kE + 
+                             income_45k_50kE + income_50k_60kE,
+    lower_middle_income_pct = (lower_middle_income_hh / total_hh) * 100,
+    
+    # Middle income: $60k-$100k (sum next 2 brackets)
+    middle_income_hh = income_60k_75kE + income_75k_100kE,
+    middle_income_pct = (middle_income_hh / total_hh) * 100,
+    
+    # Upper-middle income: $100k-$150k (sum next 2 brackets)
+    upper_middle_income_hh = income_100k_125kE + income_125k_150kE,
+    upper_middle_income_pct = (upper_middle_income_hh / total_hh) * 100,
+    
+    # Upper income: $150k-$200k (single bracket)
+    upper_income_hh = income_150k_200kE,
+    upper_income_pct = (upper_income_hh / total_hh) * 100,
+    
+    # Super-upper income: $200k+ (single bracket)
+    super_upper_income_hh = income_200k_plusE,
+    super_upper_income_pct = (super_upper_income_hh / total_hh) * 100
+  )
+```
+
+------------------------------------------------------------------------
+
+## Block 3: Education Classification
+
+**What this block does:**
+
+\- Takes 7 education categories
+
+→ Creates 3 meaningful levels
+
+\- Groups education by major workforce divides
+
+\- All percentages based on population 25+ years old
+
+**The 3 levels:**
+
+\- Non-college: High school grad + some college + associate's degree (no 4-year degree)
+
+\- College: Bachelor's degree only
+
+\- Graduate+: Master's + Professional degree + Doctorate (all post-bachelor's)
+
+```{r}
+# Calculate education level percentages
+census_education <- census_income %>%
+  mutate(
+    # Non-college: HS through associate's (workers without 4-year degree)
+    non_college_pop = edu_high_schoolE + edu_some_collegeE + edu_associatesE,
+    non_college_pct = (non_college_pop / edu_total_25plusE) * 100,
+    
+    # College: Bachelor's degree only
+    college_pop = edu_bachelorsE,
+    college_pct = (college_pop / edu_total_25plusE) * 100,
+    
+    # Graduate+: All post-bachelor's degrees
+    graduate_plus_pop = edu_mastersE + edu_professionalE + edu_doctorateE,
+    graduate_plus_pct = (graduate_plus_pop / edu_total_25plusE) * 100,
+    
+    # Bonus: Combined college+ (bachelor's + graduate) for reference
+    college_plus_pop = college_pop + graduate_plus_pop,
+    college_plus_pct = (college_plus_pop / edu_total_25plusE) * 100
+  )
+```
+
+------------------------------------------------------------------------
+
+## Block 4: Housing Affordability
+
+**What this block does:**
+
+\- Creates housing cost burden metrics and homeownership rates
+
+\- Calculates what % of renters are cost-burdened (HUD defines 30%+ as burdened)
+
+\- Creates home value-to-income ratio (measures affordability)
+
+**The 7 metrics:**
+
+\- Homeownership rate: % of households that own their home
+
+\- Rental rate: % of households that rent
+
+\- Home value-to-income ratio: Median home price / median income (\>3.0 = affordability challenge)
+
+\- Rent burden categories: Moderate (30-35%), High (35-50%), Severe (50%+)
+
+```{r}
+# Calculate housing affordability metrics
+census_housing <- census_education %>%
+  mutate(
+    # Homeownership and rental rates
+    homeownership_rate = (owner_occupiedE / total_householdsE) * 100,
+    rental_rate = (renter_occupiedE / total_householdsE) * 100,
+    
+    # Rent burden categories (% of renters in each category)
+    rent_burden_moderate_pct = (rent_burden_30_35pctE / rent_burden_totalE) * 100,
+    rent_burden_high_pct = ((rent_burden_35_40pctE + rent_burden_40_50pctE) / 
+                            rent_burden_totalE) * 100,
+    rent_burden_severe_pct = (rent_burden_50pct_plusE / rent_burden_totalE) * 100,
+    
+    # Combined: All renters paying 35%+ of income on rent
+    rent_burden_35plus_pct = ((rent_burden_35_40pctE + rent_burden_40_50pctE + 
+                               rent_burden_50pct_plusE) / rent_burden_totalE) * 100,
+    
+    # Affordability ratio: Home price relative to income
+    home_value_to_income_ratio = median_home_valueE / median_household_incomeE
+  )
+```
+
+------------------------------------------------------------------------
+
+## Block 5: Labor Market Indicators
+
+**What this block does:**
+
+\- Calculates employment and workforce participation rates
+
+\- Shows what % of labor force is employed vs. unemployed
+
+\- Measures labor force participation (how many people are working or seeking work)
+
+**The 3 metrics:**
+
+\- Employment rate: % of labor force that has a job
+
+\- Unemployment rate: % of labor force actively seeking work
+
+\- Labor force participation: % of population 16+ that is in the labor force
+
+**Result:** 3 new labor market indicators.
+
+```{r}
+# Calculate labor market rates
+census_labor <- census_housing %>%
+  mutate(
+    # Employment rate: % of labor force that is employed
+    employment_rate = (labor_force_employedE / labor_force_totalE) * 100,
+    
+    # Unemployment rate: % of labor force that is unemployed
+    unemployment_rate = (labor_force_unemployedE / labor_force_totalE) * 100,
+    
+    # Labor force participation: % of civilian pop 16+ in labor force
+    labor_force_participation = (labor_force_totalE / civilian_pop_16plusE) * 100
+  )
+```
+
+------------------------------------------------------------------------
+
+## Block 6: Poverty and Economic Distress
+
+**What this block does:**
+
+\- Calculates poverty rate (% below federal poverty line)
+
+\- Creates economic distress score combining poverty rate AND median income
+
+\- Identifies areas with concentrated economic hardship
+
+**The classification logic:**
+
+\- High distress: Poverty rate \>15% AND median income \<\$45k (both conditions)
+
+\- Moderate distress: Poverty rate \>12% OR median income \<\$50k (either condition)
+
+\- Low distress: Neither condition met
+
+```{r}
+# Calculate poverty rate and economic distress
+census_poverty <- census_labor %>%
+  mutate(
+    # Poverty rate: % of population below federal poverty line
+    poverty_rate = (poverty_below_lineE / poverty_total_popE) * 100,
+    
+    # Economic distress score: categorical variable
+    economic_distress_score = case_when(
+      poverty_rate > 15 & median_household_incomeE < 45000 ~ "High",
+      poverty_rate > 12 | median_household_incomeE < 50000 ~ "Moderate",
+      TRUE ~ "Low"
+    )
+  )
+```
+
+------------------------------------------------------------------------
+
+## Block 7: Demographics
+
+**What this block does:**
+
+\- Calculates age structure (youth, working-age, senior populations)
+
+\- Measures geographic mobility (who moved in the past year)
+
+\- Shows population stability vs. migration patterns
+
+**The 7 metrics:**
+
+\- Age groups: % under 18, % 18-64, % 65+
+
+\- Mobility: % moved within state, % moved from another state, % moved from abroad
+
+\- Total mobility rate: % of population that moved (all types combined)
+
+```{r}
+# Calculate demographic percentages
+census_final <- census_poverty %>%
+  mutate(
+    # Age structure percentages
+    youth_pct = (age_under_18E / total_populationE) * 100,
+    working_age_pct = (age_18_64E / total_populationE) * 100,
+    senior_pct = (age_65_plusE / total_populationE) * 100,
+    
+    # Mobility indicators (% who moved in past year)
+    moved_within_state_pct = (moved_within_stateE / total_pop_1yr_plusE) * 100,
+    moved_from_other_state_pct = (moved_from_other_stateE / total_pop_1yr_plusE) * 100,
+    moved_from_abroad_pct = (moved_from_abroadE / total_pop_1yr_plusE) * 100,
+    
+    # Total mobility: all movers combined
+    total_mobility_rate = ((moved_within_stateE + moved_from_other_stateE + 
+                           moved_from_abroadE) / total_pop_1yr_plusE) * 100
+  )
+```
+
+------------------------------------------------------------------------
+
+## Block 8: Create Clean Processed Dataset
+
+**What this block does:**
+
+\- Selects only the 38 variables we need for analysis
+
+\- Keeps identifiers, key original measures, and all new categorical variables
+
+\- Drops the detailed raw counts that were aggregated
+
+\- Sorts by year and state for clean organization
+
+**What gets kept:**
+
+\- 3 identifiers (year, GEOID, NAME)
+
+\- 4 original measures (population, median income, per capita income, median age)
+
+\- 2 original housing costs (median home value, median rent)
+
+\- 28 NEW categorical variables we just created
+
+```{r}
+# Select final variables for processed dataset
+census_processed <- census_final %>%
+  select(
+    # Identifiers
+    year, GEOID, NAME,
+    
+    # Population
+    total_populationE,
+    
+    # Income measures
+    median_household_incomeE, per_capita_incomeE,
+    lower_income_pct, lower_middle_income_pct, middle_income_pct,
+    upper_middle_income_pct, upper_income_pct, super_upper_income_pct,
+    
+    # Education
+    non_college_pct, college_pct, graduate_plus_pct, college_plus_pct,
+    
+    # Housing
+    homeownership_rate, rental_rate,
+    median_home_valueE, median_gross_rentE,
+    home_value_to_income_ratio,
+    rent_burden_moderate_pct, rent_burden_high_pct, rent_burden_severe_pct,
+    rent_burden_35plus_pct,
+    
+    # Labor market
+    employment_rate, unemployment_rate, labor_force_participation,
+    
+    # Poverty
+    poverty_rate, economic_distress_score,
+    
+    # Demographics
+    median_ageE, youth_pct, working_age_pct, senior_pct,
+    total_mobility_rate, moved_within_state_pct,
+    moved_from_other_state_pct, moved_from_abroad_pct
+  ) %>%
+  arrange(year, NAME)
+
+# Show dimensions
+cat("Final processed dataset:", nrow(census_processed), "rows ×", 
+    ncol(census_processed), "columns\n")
+```
+
+------------------------------------------------------------------------
+
+## Block 9: Data Quality Check
+
+**What this block does:**
+
+\- Checks for missing values across all variables
+
+\- Verifies that income percentages sum to \~100% (validates our calculations)
+
+\- Shows summary statistics for key economic indicators
+
+**Why this matters:**
+
+\- Ensures our calculations are correct
+
+\- Identifies any data quality issues
+
+\- Confirms percentages are in valid ranges
+
+```{r}
+# Check for missing values
+cat("=== MISSING VALUES CHECK ===\n\n")
+missing_summary <- census_processed %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "missing_count") %>%
+  filter(missing_count > 0) %>%
+  arrange(desc(missing_count))
+
+if (nrow(missing_summary) > 0) {
+  print(missing_summary)
+} else {
+  cat("✓ No missing values detected\n")
+}
+
+# Verify income percentages sum to 100%
+cat("\n=== INCOME BAND VALIDATION ===\n")
+income_check <- census_processed %>%
+  mutate(
+    income_total = lower_income_pct + lower_middle_income_pct + 
+                   middle_income_pct + upper_middle_income_pct + 
+                   upper_income_pct + super_upper_income_pct
+  ) %>%
+  summarise(
+    min = min(income_total, na.rm = TRUE),
+    mean = mean(income_total, na.rm = TRUE),
+    max = max(income_total, na.rm = TRUE)
+  )
+print(income_check)
+cat("✓ Should be ~100% (allows for rounding)\n")
+
+# Summary statistics
+cat("\n=== KEY INDICATORS SUMMARY ===\n")
+census_processed %>%
+  select(median_household_incomeE, poverty_rate, college_plus_pct, 
+         homeownership_rate, unemployment_rate) %>%
+  summary()
+```
+
+------------------------------------------------------------------------
+
+## Block 10: Save Processed Data
+
+**What this block does:** - Saves the final processed dataset as a CSV file - Makes it available for your economic analysis
+
+**Output:** - `census_economic_data_processed.csv` - Your clean, analysis-ready dataset
+
+**Result:** CSV file with 624 rows × 38 columns ready to use.
+
+```{r}
+# Save processed dataset
+write_csv(census_processed, "census_economic_data_processed.csv")
+
+cat("✓ Saved: census_economic_data_processed.csv\n")
+cat("\nProcessed dataset ready for analysis!\n")
+cat("  - 624 observations (52 states × 12 years)\n")
+cat("  - 38 variables (down from 107)\n")
+cat("  - 28 new categorical variables created\n")
+```
+
+------------------------------------------------------------------------
