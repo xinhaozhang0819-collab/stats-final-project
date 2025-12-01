@@ -1,0 +1,135 @@
+---
+title: "economic_data"
+format: pdf
+editor: visual
+---
+
+## IDS 702: Final Project FALL 2025
+
+## Statistical Analysis of Election Outcomes in the USA, 2000-2024
+
+## **Economic Data Download**
+
+**Block 1: Load packages**
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(janitor)
+
+cat("✓ Packages loaded\n")
+```
+
+**Block 2: Set up API key**
+
+```{r}
+# Check if API key is already installed
+if(Sys.getenv("CENSUS_API_KEY") == "") {
+  # If not, uncomment line below and add your key:
+  census_api_key("ac913841c1d40db7500f47ab697722898a0a306a", install = TRUE, overwrite = TRUE)
+  cat("⚠ No API key found. Add your key above.\n")
+} else {
+  cat("✓ Census API key found\n")
+}
+```
+
+**Block 3: Define economic variables**
+
+```{r}
+# Define variables
+economic_variables <- c(
+  # Income & Poverty
+  "median_household_income" = "B19013_001",
+  "per_capita_income" = "B19301_001",
+  "poverty_total_pop" = "B17001_001",
+  "poverty_below_line" = "B17001_002",
+  
+  # Income Distribution (individual brackets)
+  "income_under_10k" = "B19001_002",
+  "income_10k_15k" = "B19001_003",
+  "income_15k_20k" = "B19001_004",
+  "income_20k_25k" = "B19001_005",
+  "income_25k_30k" = "B19001_006",
+  "income_30k_35k" = "B19001_007",
+  "income_35k_40k" = "B19001_008",
+  "income_40k_45k" = "B19001_009",
+  "income_45k_50k" = "B19001_010",
+  "income_50k_60k" = "B19001_011",
+  "income_60k_75k" = "B19001_012",
+  "income_75k_100k" = "B19001_013",
+  "income_100k_125k" = "B19001_014",
+  "income_125k_150k" = "B19001_015",
+  "income_150k_200k" = "B19001_016",
+  "income_200k_plus" = "B19001_017",
+  
+  # Employment
+  "labor_force_total" = "B23025_002",
+  "labor_force_employed" = "B23025_004",
+  "labor_force_unemployed" = "B23025_005",
+  "civilian_pop_16plus" = "B23025_001",
+  
+  # Housing
+  "median_home_value" = "B25077_001",
+  "median_gross_rent" = "B25064_001",
+  "total_households" = "B25003_001",
+  "owner_occupied" = "B25003_002",
+  "renter_occupied" = "B25003_003",
+  "rent_burden_total" = "B25070_001",
+  "rent_burden_30_35pct" = "B25070_007",
+  "rent_burden_35_40pct" = "B25070_008",
+  "rent_burden_40_50pct" = "B25070_009",
+  "rent_burden_50pct_plus" = "B25070_010",
+  
+  # Education
+  "edu_total_25plus" = "B15003_001",
+  "edu_less_than_hs" = "B15003_002",
+  "edu_high_school" = "B15003_017",
+  "edu_some_college" = "B15003_019",
+  "edu_associates" = "B15003_021",
+  "edu_bachelors" = "B15003_022",
+  "edu_masters" = "B15003_023",
+  "edu_professional" = "B15003_024",
+  "edu_doctorate" = "B15003_025",
+  
+  # Demographics
+  "total_population" = "B01003_001",
+  "pop_18_plus" = "B09021_001"
+)
+
+# Set years
+YEARS_ACS <- 2011:2023
+GEOGRAPHY <- "state"
+
+# Download ACS 1-year data
+acs_data_list <- map(YEARS_ACS, function(yr) {
+  cat(sprintf("Year %d: ", yr))
+  
+  tryCatch({
+    data <- get_acs(
+      geography = GEOGRAPHY,
+      variables = economic_variables,
+      year = yr,
+      survey = "acs1",
+      output = "wide"
+    ) %>%
+      mutate(year = yr, .before = 1)
+    
+    cat(sprintf("✓ %d records\n", nrow(data)))
+    return(data)
+  }, error = function(e) {
+    cat("✗ Failed\n")
+    return(NULL)
+  })
+})
+
+# Remove failed years
+acs_data_list <- acs_data_list[!sapply(acs_data_list, is.null)]
+
+# Combine all years
+census_data_all <- bind_rows(acs_data_list)
+
+# Save to CSV
+write_csv(census_data_all, "census_economic_data_raw2.csv")
+
+cat("\n✓ Data saved to census_economic_data_raw2.csv\n")
+```
