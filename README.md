@@ -1,76 +1,141 @@
-# Stats Final Project: Voting & Economic Analysis
+# Unemployment & Voter Turnout Analysis
+## Statistical Analysis Project - STA 702
 
-This project investigates the relationship between economic indicators (unemployment, income) and voter turnout/partisan shifts in U.S. counties from 2000 to 2022.
+**Research Question:** How does local economic downturn relate to voter turnout in U.S. elections at the county level?
 
-## Project Structure
+This project analyzes the relationship between county-level unemployment rates and voter turnout across U.S. presidential and midterm elections (2004-2022), with emphasis on heterogeneous effects across urban/rural counties.
+
+## 📁 Project Structure
 
 ```
 ├── data/
-│   ├── raw/            # Original datasets (ICPSR_38506-V2.zip)
-│   ├── processed/      # Cleaned data (voting_population_cleaned.parquet)
-│   └── output/         # Model results and final tables
-├── notebooks/          # Jupyter notebooks for analysis
-│   ├── Preprocess_VotingPop.ipynb
-│   └── Project_Proposal.qmd
-├── plots/              # Generated EDA visualizations
-    ├── voter_turnout_trends.png
-    ├── partisan_index_trends.png
-    ├── turnout_distribution.png
-    └── correlation_heatmap.png
-
+│   ├── raw/                          # Original datasets (Git LFS)
+│   │   ├── ICPSR_38506-V2.zip       # Voting data (ICPSR)
+│   │   └── la.data.64.County.txt    # Unemployment data (BLS)
+│   ├── processed/                    # Clean, analysis-ready datasets
+│   │   ├── merged_voting_unemployment_complete.csv  # ⭐ PRIMARY DATASET
+│   │   ├── voting_population_cleaned.csv           # Cleaned voting data
+│   │   ├── unemployment_county_year.csv            # Cleaned unemployment data
+│   │   └── analysis_data_r.csv                     # R analysis dataset (with derived vars)
+│   └── output/                       # Regression results
+│       ├── regression_models.RData   # Saved R model objects
+│       └── regression_table.tex      # Publication-ready table
+├── notebooks/                        # Analysis code
+│   ├── Research_Question_1_Analysis.qmd   # ⭐ MAIN ANALYSIS (R/Quarto)
+│   ├── Preprocess_VotingPop.ipynb         # ⭐ DATA PREP (clean + merge + QA)
+│   ├── unemployment_preprocessing.R       # Unemployment data cleaning
+│   └── Project_Proposal.qmd               # Original proposal
+├── plots/                            # Visualizations
+└── economic_factors/                 # Census economic data
 ```
 
-## Milestones & Progress
+## ✅ Project Status
 
-### ✅ Milestone 1: Data Acquisition & Preprocessing (Completed)
-- [x] **Voting Population Data:** Loaded raw ICPSR data, cleaned missing values, converted types.
-- [x] **FIPS Standardization:** Extracted and formatted State/County FIPS codes for merging.
-- [x] **Data Export:** Saved cleaned dataset as optimized Parquet file (`voting_population_cleaned.parquet`).
+### Completed
+- ✅ **Data Collection & Cleaning** (Voting + Unemployment data)
+- ✅ **Data Quality Assessment** (Comprehensive diagnostics)
+- ✅ **Data Merging** (30,912 county-year observations, 2004-2022)
+- ✅ **Exploratory Analysis** (Descriptive stats, visualizations)
+- ✅ **Statistical Modeling** (5 regression models with interaction terms)
+- ✅ **Results Documentation** (Quarto report ready)
 
-### ✅ Milestone 2: Exploratory Data Analysis (Completed)
-- [x] **Visualizations:** Generated trend lines for voter turnout and partisan index (2000-2022).
-- [x] **Correlations:** Analyzed relationships between registration, turnout, and partisan lean.
-- [x] **Quality Check:** Verified data consistency and identified outlier counties.
+### Key Deliverables
+- **Data Preprocessing:** `Preprocess_VotingPop.ipynb` (all cleaning, QA, merging)
+- **Primary Analysis:** `Research_Question_1_Analysis.qmd` (render to HTML/PDF)
+- **Clean Dataset:** `merged_voting_unemployment_complete.csv` (30,912 obs)
+- **Regression Results:** Saved in `data/output/regression_models.RData`
 
-### 📅 Milestone 3: Data Merging (Next Step)
-- [ ] **Economic Data:** Merge with USDA Unemployment and Income datasets.
-- [ ] **Election Data:** Merge with MIT Election Lab presidential returns.
-- [ ] **Master Dataset:** Create final `master_analysis.parquet` for modeling.
+## 🔍 Key Findings
 
-### 📅 Milestone 4: Statistical Modeling
-- [ ] **Regression Analysis:** Fixed Effects models to estimate impact of economic downturns on turnout.
-- [ ] **Hypothesis Testing:** Test if economic distress shifts partisan preference.
-- [ ] **Final Report:** Summarize findings in Quarto/PDF format.
+### 1. Unemployment-Turnout Relationship
+- **Weak negative correlation** (r = -0.041, p < 0.001) between unemployment and voter turnout
+- Correlation is **stronger in midterm elections** (r = -0.135) than presidential elections (r = -0.083)
+- **State-level correlation** is stronger (r = -0.309) than county-level
 
-## Data Notes
+### 2. Election Type Dominates
+- **Presidential elections:** 58.8% average turnout
+- **Midterm elections:** 42.6% average turnout  
+- **16.3 percentage point difference** (t = 94.1, p < 0.001) - highly significant
+
+### 3. Temporal Patterns
+- **2010 unemployment peak** (9.29%) during Great Recession aftermath
+- **2020 turnout peak** (62.9%) despite COVID-19 pandemic
+- **2022 lowest unemployment** (3.60%) in the analysis period
+
+### 4. Geographic Variation
+- **Highest turnout states:** Maine (66.0%), Colorado (65.3%), Montana (63.0%)
+- **Lowest turnout states:** West Virginia (35.5%), Tennessee (39.6%), Mississippi (41.6%)
+- **3,007 counties** have complete data for all 10 election cycles (balanced panel)
+
+## Data Quality Notes
+
+### Missing Data Patterns
+- **Years 2000-2002:** 100% missing CVAP (Citizen Voting Age Population) - excluded from analysis
+- **Years 2004-2022:** <1% missing CVAP, suitable for modeling
+- **Senate elections:** ~53% missing (expected - not all years have Senate races)
+- **Presidential elections:** ~47% missing (expected - presidential races every 4 years)
+
+### FIPS Code Issues
+- **99.7% match rate** between voting and unemployment data
+- **11 unmatched counties:** Primarily Connecticut (different coding system) and reorganized counties
+- Unmatched details documented in `Preprocess_VotingPop.ipynb`
 
 ### Negative Values in Voter Turnout
-During data inspection, negative values (`-1.0`) were observed in the `REG_VOTER_TURNOUT_PCT` column.
-- **North Dakota (State FIPS 38):** Accounts for the majority of these cases (477 rows). North Dakota does not have voter registration, so this metric is inapplicable.
-- **Other States:** Illinois, South Carolina, and Mississippi also contain some `-1.0` values, likely indicating missing data.
+- **North Dakota (State FIPS 38):** 477 rows with `-1.0` (no voter registration requirement)
+- **6 records** with negative turnout (data errors) - flagged for exclusion
+- **Other States:** Illinois, South Carolina, Mississippi contain some `-1.0` values (missing data indicators)
 - **Recommendation:** Filter out these values or treat them as `NaN` during analysis.
 
-## Usage
-1. **Setup:** Ensure `data/raw` contains the source zip file.
-2. **Preprocess:** Run `notebooks/Preprocess_VotingPop.ipynb` to generate cleaned data.
+## 🚀 Quick Start
 
-## Data Pipeline Workflow
+### To Reproduce Analysis
+1. **Open main analysis:** `notebooks/Research_Question_1_Analysis.qmd`
+2. **Render in RStudio:** Click "Render" or press `Ctrl+Shift+K`
+3. **View results:** Opens as HTML with all analysis, plots, and regression tables
 
-```mermaid
-graph TD
-    A[Raw Data ICPSR Zip] -->|Extract & Clean| B[Preprocess Notebook]
-    B -->|Export| C{Cleaned Data}
-    C -->|Parquet| D[voting_population_cleaned.parquet]
-    C -->|EDA Script| E[Visualizations]
-    E --> F[Plots Directory]
-    D -->|Merge| G[Master Dataset]
-    H[Economic Data] -->|Merge| G
-    I[MIT Election Data] -->|Merge| G
-    G -->|Analysis| J[Statistical Models]
-```
+### To Explore Data
+- **Dataset:** `data/processed/merged_voting_unemployment_complete.csv`
+- **Data quality report:** See `Preprocess_VotingPop.ipynb` for full diagnostics
+- **Visualizations:** `plots/` directory
 
-## Data Citation
+### Dataset Details
+- **30,912 observations** (county-year level)
+- **3,103 counties** across 50 states
+- **10 election cycles** (2004-2022: 5 presidential + 5 midterm)
+- **Complete data** (no missing values in key variables)
+- **Balanced panel** available (3,007 counties with all 10 years)
 
-**National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022 (ICPSR 38506)**
+### County Classification
+Counties classified by **CVAP (Citizen Voting Age Population)**:
+- **Urban**: CVAP > 50,000 (large metropolitan counties)
+- **Suburban**: CVAP 10,000-50,000 (medium-sized counties)
+- **Rural**: CVAP < 10,000 (small, sparsely populated counties)
 
-> Clary, Will, Gomez-Lopez, Iris N., Chenoweth, Megan, Gypin, Lindsay, Clarke, Philippa, Noppert, Grace, Li, Mao, and Kollman, Ken. National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022. Ann Arbor, MI: Inter-university Consortium for Political and Social Research [distributor], 2024-10-14. https://doi.org/10.3886/ICPSR38506.v2
+This classification captures heterogeneous effects of unemployment across different county contexts.
+
+## 📊 Main Results
+
+**Research Question:** How does local economic downturn relate to voter turnout?
+
+### Regression Results Summary (5 Models)
+
+| Model | Unemployment Coef | R² | Interpretation |
+|-------|-------------------|-----|----------------|
+| Simple OLS | -0.003*** | 0.002 | Baseline: weak negative effect |
+| + Election Type | -0.006*** | 0.232 | Presidential elections +16.7% turnout |
+| + Interaction | -0.010*** (rural) | 0.254 | **Stronger effect in rural counties** |
+| Two-Way FE | -0.001 | 0.570 | Within-county: no significant effect |
+| FE + Interaction | -0.003*** | 0.571 | Effect persists with controls |
+
+**Key Finding:** Unemployment has a **small negative effect** on turnout (-0.3 to -0.6 percentage points per 1% unemployment increase), **strongest in rural counties**, but election type matters far more (16.7% difference between presidential and midterm elections).
+
+## 📚 Data Sources & Citations
+
+**Voting Data:**
+> Clary, Will, et al. National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022 (ICPSR 38506). Ann Arbor, MI: Inter-university Consortium for Political and Social Research, 2024. https://doi.org/10.3886/ICPSR38506.v2
+
+**Unemployment Data:**
+> Bureau of Labor Statistics, Local Area Unemployment Statistics (LAUS), 1990-2024.
+
+## 👥 Team
+Diwas Puri, Xinhao Zhang, Tea Tafaj, Tony Ngari - STA 702, Duke University

@@ -1,0 +1,48 @@
+
+% Table created by stargazer v.5.2.3 by Marek Hlavac, Social Policy Institute. E-mail: marek.hlavac at gmail.com
+% Date and time: Wed, Dec 03, 2025 - 2:36:41 PM
+\begin{table}[!htbp] \centering 
+  \caption{Effect of Unemployment on Voter Turnout} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{5}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-6} 
+\\[-1.8ex] & \multicolumn{5}{c}{Voter Turnout Rate} \\ 
+\\[-1.8ex] & \multicolumn{3}{c}{\textit{OLS}} & \multicolumn{2}{c}{\textit{felm}} \\ 
+ & OLS & + Election & + Interaction & FE & FE + Int \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4) & (5)\\ 
+\hline \\[-1.8ex] 
+ unemployment\_rate & $-$0.003$^{***}$ & $-$0.006$^{***}$ & $-$0.010$^{***}$ & $-$0.001 & $-$0.003$^{***}$ \\ 
+  & (0.0004) & (0.0003) & (0.001) & (0.001) & (0.001) \\ 
+  & & & & & \\ 
+ county\_typeSuburban &  &  & $-$0.094$^{***}$ &  & $-$0.044$^{***}$ \\ 
+  &  &  & (0.005) &  & (0.011) \\ 
+  & & & & & \\ 
+ county\_typeUrban &  &  & $-$0.082$^{***}$ &  & $-$0.060$^{***}$ \\ 
+  &  &  & (0.006) &  & (0.015) \\ 
+  & & & & & \\ 
+ is\_presidential &  & 0.167$^{***}$ & 0.166$^{***}$ &  &  \\ 
+  &  & (0.002) & (0.002) &  &  \\ 
+  & & & & & \\ 
+ unemployment\_rate:county\_typeSuburban &  &  & 0.007$^{***}$ &  & 0.003$^{***}$ \\ 
+  &  &  & (0.001) &  & (0.001) \\ 
+  & & & & & \\ 
+ unemployment\_rate:county\_typeUrban &  &  & 0.007$^{***}$ &  & 0.003$^{***}$ \\ 
+  &  &  & (0.001) &  & (0.001) \\ 
+  & & & & & \\ 
+ Constant & 0.522$^{***}$ & 0.462$^{***}$ & 0.516$^{***}$ &  &  \\ 
+  & (0.002) & (0.002) & (0.004) &  &  \\ 
+  & & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 30,912 & 30,912 & 30,912 & 30,912 & 30,912 \\ 
+R$^{2}$ & 0.002 & 0.232 & 0.254 & 0.570 & 0.571 \\ 
+Adjusted R$^{2}$ & 0.002 & 0.232 & 0.253 & 0.522 & 0.522 \\ 
+Residual Std. Error & 0.172 (df = 30910) & 0.151 (df = 30909) & 0.149 (df = 30905) & 0.119 (df = 27799) & 0.119 (df = 27795) \\ 
+F Statistic & 50.883$^{***}$ (df = 1; 30910) & 4,678.200$^{***}$ (df = 2; 30909) & 1,749.269$^{***}$ (df = 6; 30905) &  &  \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{5}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
