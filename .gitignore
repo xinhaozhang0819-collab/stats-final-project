@@ -1,6 +1,3 @@
-# Large data files
-data/raw/la.data.64.County.txt
-
 # Python
 __pycache__/
 *.py[cod]
