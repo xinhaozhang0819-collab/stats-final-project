@@ -1,0 +1,86 @@
+---
+title: "Economic Downturn and Incumbent Support"
+subtitle: "Research Question 2: Does local economic downturn affect support for the incumbent presidential party?"
+author: "Statistical Analysis - STA 702"
+date: today
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    self-contained: true
+  pdf:
+    documentclass: article
+    geometry: margin=1in
+    fontsize: 11pt
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 300
+)
+```
+
+# Introduction
+
+This analysis addresses Research Question 2:
+
+> **Does local economic downturn affect the probability that a county supports the incumbent presidential party?**
+
+We use the same county-year panel dataset as in Research Question 1, combining county-level unemployment rates with U.S. presidential election results from 2004–2020.
+
+**Key Ideas:**
+
+- Rather than using unemployment *levels*, we focus on **unemployment relative to a county’s own long-run average** (local economic stress).
+- We study whether counties experiencing worse-than-usual unemployment are **more or less likely to vote for the incumbent presidential party**.
+- We use **fixed effects models** to compare counties to themselves over time, controlling for unobserved, time-invariant county characteristics and common national shocks.
+
+**Key Variables (RQ2):**
+
+- **Outcome:** `incumbent_win` — indicator = 1 if the county votes for the incumbent presidential party, 0 otherwise  
+- **Predictor:** `unemp_change` — county unemployment rate minus the county’s historical mean unemployment  
+
+**Controls / Structure:**
+
+- County fixed effects (`FIPS`)  
+- Year fixed effects (`YEAR`)  
+- Optional: county type (Urban/Suburban/Rural) for heterogeneous effects
+
+# Data Preparation
+
+```{r load-packages}
+# Load required packages
+library(tidyverse)
+library(lfe)           # For fixed effects regression (linear probability model)
+library(stargazer)     # For regression tables
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+
+# Set ggplot theme
+
+theme_set(theme_minimal(base_size = 12))
+```
+
+```{r load-data}
+# Load the merged dataset
+df <- read_csv("../data/processed/merged_voting_unemployment_complete.csv",
+               show_col_types = FALSE)
+
+# Display data structure
+cat("Dataset Overview:\n")
+cat("Observations:", nrow(df), "\n")
+cat("Counties:", length(unique(df$FIPS)), "\n")
+cat("Years:", min(df$YEAR), "-", max(df$YEAR), "\n")
+cat("Variables:", ncol(df), "\n")
+```
+
+## Variable Creation
