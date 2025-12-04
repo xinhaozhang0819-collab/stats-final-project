@@ -39,20 +39,26 @@ We use the same county-year panel dataset as in Research Question 1, combining c
 
 **Key Ideas:**
 
-- Rather than using unemployment *levels*, we focus on **unemployment relative to a county’s own long-run average** (local economic stress).
-- We study whether counties experiencing worse-than-usual unemployment are **more or less likely to vote for the incumbent presidential party**.
-- We use **fixed effects models** to compare counties to themselves over time, controlling for unobserved, time-invariant county characteristics and common national shocks.
+-   Rather than using unemployment *levels*, we focus on **unemployment relative to a county’s own long-run average** (local economic stress).
+-   We study whether counties experiencing worse-than-usual unemployment are **more or less likely to vote for the incumbent presidential party**.
+-   We use **fixed effects models** to compare counties to themselves over time, controlling for unobserved, time-invariant county characteristics and common national shocks.
 
 **Key Variables (RQ2):**
 
-- **Outcome:** `incumbent_win` — indicator = 1 if the county votes for the incumbent presidential party, 0 otherwise  
-- **Predictor:** `unemp_change` — county unemployment rate minus the county’s historical mean unemployment  
+-   **Outcome:** `incumbent_win` — indicator = 1 if the county votes for the incumbent presidential party, 0 otherwise\
+-   **Predictor:** `unemp_change` — county unemployment rate minus the county’s historical mean unemployment
 
 **Controls / Structure:**
 
-- County fixed effects (`FIPS`)  
-- Year fixed effects (`YEAR`)  
-- Optional: county type (Urban/Suburban/Rural) for heterogeneous effects
+-   County fixed effects (`FIPS`)\
+-   Year fixed effects (`YEAR`)\
+-   Optional: county type (Urban/Suburban/Rural) for heterogeneous effects
+
+**The Core Model**
+
+logit(Pr\[incumbent_winc,y​=1\])=β⋅unemployment_ratec,y​+αc​+γy​+ϵc,y​
+
+Where:
 
 # Data Preparation
 
@@ -84,3 +90,57 @@ cat("Variables:", ncol(df), "\n")
 ```
 
 ## Variable Creation
+
+```{r}
+names(df)
+```
+
+```{r}
+#Create incumbent-party lookup table
+incumbent_table <- tibble(
+  YEAR = c(2000, 2004, 2008, 2012, 2016, 2020),
+  incumbent_party = c("DEM", "REP", "REP", "DEM", "DEM", "REP")
+)
+
+#Merge with df
+df <- df %>%
+  left_join(incumbent_table, by = "YEAR")
+
+#Simplify winner in each County
+df <- df %>%
+  mutate(
+    winner_party = case_when(
+      PRES_DEM_VOTES > PRES_REP_VOTES ~ "DEM",
+      PRES_REP_VOTES > PRES_DEM_VOTES ~ "REP",
+      TRUE ~ NA_character_  # in case of ties or missing
+    )
+  )
+
+
+```
+
+```{r}
+#Creation of the variable incumbent_win
+
+df <- df %>%
+  mutate(
+    incumbent_win = if_else(winner_party == incumbent_party, 1, 0)
+  )
+
+
+```
+
+```{r}
+#Checking results
+table(df$incumbent_win, useNA = "ifany")
+head(df %>% select(YEAR, PRES_DEM_VOTES, PRES_REP_VOTES, winner_party, incumbent_party, incumbent_win))
+
+```
+
+```{r}
+#Keep only presidential election years
+
+df_pres <- df %>% filter(YEAR %in% c(2000, 2004, 2008, 2012, 2016, 2020))
+
+
+```
