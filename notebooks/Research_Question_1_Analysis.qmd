@@ -29,6 +29,72 @@ knitr::opts_chunk$set(
 )
 ```
 
+# **Theoretical Motivation - Political Participation Framework** 
+
+Political theory suggests that populations differ in their typical level of political engagement. Almond and Verba’s classic “Civic Culture” framework describes a participation pyramid in which the largest group consists of disengaged citizens (“parochials”), followed by moderately involved voters (“subjects”), and finally a small group of highly engaged participants. In many systems, this bottom tier — often described as a “silent majority” — remains politically inactive unless economic or social conditions deteriorate. Under worsening economic conditions, previously uninvolved citizens may become mobilized to vote, either to punish the incumbent or express dissatisfaction with the status quo. This idea motivates our investigation of whether local economic downturns, measured through rising unemployment, affect the incumbent party’s electoral performance at the county level.\
+\
+Almond, Gabriel A., and Sidney Verba. *The Civic Culture: Political Attitudes and Democracy in Five Nations.* Princeton University Press, 1963
+
+Berelson, Bernard R., Paul F. Lazarsfeld, and William N. McPhee. *Voting: A Study of Opinion Formation in a Presidential Campaign.* University of Chicago Press, 1954.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Data: three layers of the participation pyramid
+pyramid_df <- tibble(
+  level = factor(c("Participants", "Subjects", "Parochials"), 
+                 levels = c("Participants", "Subjects", "Parochials")),
+  ymin = c(0.66, 0.33, 0),
+  ymax = c(1, 0.66, 0.33),
+  label = c(
+    "Participants:\nHighly engaged voters;\nconsistent political activity",
+    "Subjects:\nModerately engaged;\nresponsive in major elections",
+    "Parochials:\nLow engagement;\n'Silent Majority'\nactivated by crises"
+  )
+)
+
+# Base triangle shape
+triangle <- data.frame(
+  x = c(0.5, 1, 0),
+  y = c(1, 0, 0)
+)
+
+ggplot() +
+  # Triangle outline
+  geom_polygon(data = triangle, aes(x, y), fill = "white", color = "black") +
+  
+  # Layers inside the triangle
+  geom_rect(data = pyramid_df, 
+            aes(xmin = 0, xmax = 1, ymin = ymin, ymax = ymax, fill = level),
+            alpha = 0.6, color = "black") +
+  
+  # Descriptive text inside each layer
+  geom_text(data = pyramid_df,
+            aes(x = 0.5, y = (ymin + ymax) / 2, label = label),
+            color = "black", size = 4, lineheight = 1,
+            fontface = "bold") +
+  
+  scale_fill_manual(values = c(
+    "Participants" = "#6fa8dc",
+    "Subjects" = "#9fc5e8",
+    "Parochials" = "#cfe2f3"
+  )) +
+  
+  coord_fixed() +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  ) +
+  ggtitle("Political Participation Pyramid")
+
+
+
+
+
+```
+
 # Introduction
 
 This analysis investigates the relationship between local economic conditions (measured by unemployment rate) and voter turnout in U.S. presidential and midterm elections from 2004-2022.
