@@ -345,5 +345,3 @@ df_pres %>%
 This plot compares average incumbent support between counties above and below the median unemployment rate. Counties with lower unemployment have a higher probability of supporting the incumbent, while those experiencing above-median unemployment show reduced incumbent support.
 
 Although this visualization is descriptive, it aligns closely with the fixed-effects estimates, indicating that incumbent support tends to decline when local economic conditions deteriorate. The difference between the two groups provides an intuitive summary of the economic voting pattern found in the analysis.
-=======
->>>>>>> f9e783686a514250f7df58ebc69516285c594cd7
