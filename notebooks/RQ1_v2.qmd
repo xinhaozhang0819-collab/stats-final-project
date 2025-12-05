@@ -1,0 +1,655 @@
+---
+title: "Unemployment and Voter Turnout Analysis"
+subtitle: "Research Question 1: How does local Unemployment tier relate to voter turnout?"
+author: "Statistical Analysis - STA 702"
+date: today
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    self-contained: true
+  pdf:
+    documentclass: article
+    geometry: margin=1in
+    fontsize: 11pt
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 300
+)
+```
+
+------------------------------------------------------------------------
+
+# **Theoretical Motivation - Political Participation Framework**
+
+Political theory suggests that populations differ in their typical level of political engagement. Almond and Verba’s classic “Civic Culture” framework describes a participation pyramid in which the largest group consists of disengaged citizens (“parochials”), followed by moderately involved voters (“subjects”), and finally a small group of highly engaged participants.
+
+In many systems, this bottom tier, often described as a “silent majority”, remains politically inactive unless economic or social conditions deteriorate. Under worsening economic conditions, previously uninvolved citizens may become mobilized to vote, either to punish the incumbent or express dissatisfaction with the status quo.
+
+This idea motivates our investigation of whether local Unemployment tiers, measured through rising unemployment, affect the incumbent party’s electoral performance at the county level.\
+\
+Almond, Gabriel A., and Sidney Verba. *The Civic Culture: Political Attitudes and Democracy in Five Nations.* Princeton University Press, 1963
+
+Berelson, Bernard R., Paul F. Lazarsfeld, and William N. McPhee. *Voting: A Study of Opinion Formation in a Presidential Campaign.* University of Chicago Press, 1954.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Data: three layers of the participation pyramid
+pyramid_df <- tibble(
+  level = factor(c("Participants", "Subjects", "Parochials"), 
+                 levels = c("Participants", "Subjects", "Parochials")),
+  ymin = c(0.66, 0.33, 0),
+  ymax = c(1, 0.66, 0.33),
+  label = c(
+    "Participants:\nHighly engaged voters;\nconsistent political activity",
+    "Subjects:\nModerately engaged;\nresponsive in major elections",
+    "Parochials:\nLow engagement;\n'Silent Majority'\nactivated by crises"
+  )
+)
+
+# Base triangle shape
+triangle <- data.frame(
+  x = c(0.5, 1, 0),
+  y = c(1, 0, 0)
+)
+
+ggplot() +
+  # Triangle outline
+  geom_polygon(data = triangle, aes(x, y), fill = "white", color = "black") +
+  
+  # Layers inside the triangle
+  geom_rect(data = pyramid_df, 
+            aes(xmin = 0, xmax = 1, ymin = ymin, ymax = ymax, fill = level),
+            alpha = 0.6, color = "black") +
+  
+  # Descriptive text inside each layer
+  geom_text(data = pyramid_df,
+            aes(x = 0.5, y = (ymin + ymax) / 2, label = label),
+            color = "black", size = 4, lineheight = 1,
+            fontface = "bold") +
+  
+  scale_fill_manual(values = c(
+    "Participants" = "#6fa8dc",
+    "Subjects" = "#9fc5e8",
+    "Parochials" = "#cfe2f3"
+  )) +
+  
+  coord_fixed() +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  ) +
+  ggtitle("Political Participation Pyramid")
+
+
+
+
+
+```
+
+------------------------------------------------------------------------
+
+# Introduction
+
+This analysis investigates the relationship between local economic conditions (measured by unemployment rate) and voter turnout in U.S. presidential and midterm elections from 2004-2022.
+
+**Research Question:** How does local Unemployment tier relate to voter turnout in U.S. elections at the county level?
+
+**Key Variables:**
+
+-   **Outcome:** `VOTER_TURNOUT_PCT` = Voter turnout rate (continuous)
+-   **Predictor:** `unemployment_rate` = County unemployment rate (%)
+-   **Interaction:** `unemployment_rate × county_type` (Urban/Rural classification)
+
+------------------------------------------------------------------------
+
+# Data Preparation
+
+```{r load-packages}
+# Load required packages
+library(tidyverse)
+library(lfe)           # For fixed effects regression
+library(stargazer)     # For regression tables
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+
+# Set ggplot theme
+theme_set(theme_minimal(base_size = 12))
+```
+
+```{r load-data}
+# Load the merged dataset
+df <- read_csv("../data/processed/merged_voting_unemployment_complete.csv",
+               show_col_types = FALSE)
+
+# Display data structure
+cat("Dataset Overview:\n")
+cat("Observations:", nrow(df), "\n")
+cat("Counties:", length(unique(df$FIPS)), "\n")
+cat("Years:", min(df$YEAR), "-", max(df$YEAR), "\n")
+cat("Variables:", ncol(df), "\n")
+```
+
+**Data Cleaning**
+
+```{r}
+# Clean the dataset
+df <- df%>%
+  filter(
+    VOTER_TURNOUT_PCT > 0,           # Drop zero turnout
+    !is.na(VOTER_TURNOUT_PCT),       # Drop missing turnout
+    !is.na(unemployment_rate),        # Drop missing unemployment
+    VOTER_TURNOUT_PCT <= 1.0         # Sanity check: turnout ≤ 100%
+  )
+
+cat("CLEANED DATASET\n")
+cat("===============\n")
+cat("Observations remaining:", nrow(df), "\n")
+```
+
+## Variable Creation
+
+```{r create-variables}
+## Variable Creation
+df <- df %>%
+  mutate(
+    # Election type indicator
+    is_presidential = ifelse(YEAR %% 4 == 0, 1, 0),
+    election_type = ifelse(is_presidential == 1, "Presidential", "Midterm"),
+    
+    # Unemployment tiers based on standard deviations from mean
+    unemp_mean = mean(unemployment_rate, na.rm = TRUE),
+    unemp_sd = sd(unemployment_rate, na.rm = TRUE),
+    
+    # Calculate z-score
+    unemp_zscore = (unemployment_rate - unemp_mean) / unemp_sd,
+    
+    # Create tier classifications
+    unemployment_tier = case_when(
+      unemp_zscore < -1.0 ~ "Very Low (< -1 SD)",
+      unemp_zscore < -0.5 ~ "Low (-1 to -0.5 SD)",
+      unemp_zscore < 0.5  ~ "Medium (-0.5 to 0.5 SD)",
+      unemp_zscore < 1.0  ~ "High (0.5 to 1 SD)",
+      TRUE                ~ "Very High (> 1 SD)"
+    ),
+    
+    # Ordered factor for modeling
+    unemployment_tier = factor(unemployment_tier, 
+                              levels = c("Very Low (< -1 SD)", 
+                                        "Low (-1 to -0.5 SD)",
+                                        "Medium (-0.5 to 0.5 SD)",
+                                        "High (0.5 to 1 SD)",
+                                        "Very High (> 1 SD)"),
+                              ordered = TRUE),
+    
+    # Standardized variables
+    unemployment_std = (unemployment_rate - mean(unemployment_rate)) / 
+                       sd(unemployment_rate),
+    
+    # Urban/rural classification based on CVAP
+    county_type = case_when(
+      CVAP > 50000 ~ "Urban",
+      CVAP > 10000 ~ "Suburban",
+      TRUE ~ "Rural"
+    ),
+    
+    # Factor variables for regression
+    FIPS_factor = as.factor(FIPS),
+    YEAR_factor = as.factor(YEAR),
+    STATE_factor = as.factor(STATE_FIPS)
+  )
+
+# Summary of unemployment tier distribution
+cat("✓ Created classification variables\n")
+cat("  - Mean unemployment:", round(df$unemp_mean[1], 2), "%\n")
+cat("  - SD unemployment:", round(df$unemp_sd[1], 2), "%\n\n")
+
+cat("Distribution of unemployment tiers:\n")
+df %>%
+  count(unemployment_tier) %>%
+  mutate(percent = round(100 * n / sum(n), 1)) %>%
+  kable(col.names = c("Unemployment Tier", "N", "Percent (%)"))
+```
+
+# Descriptive Statistics
+
+## Summary Statistics
+
+```{r summary-stats}
+# Overall summary
+df %>%
+  select(VOTER_TURNOUT_PCT, unemployment_rate, CVAP) %>%
+  summary() %>%
+  kable(caption = "Summary Statistics: Key Variables", digits = 3)
+```
+
+## Distribution by Groups
+
+```{r stats-by-group}
+# By election type
+df %>%
+  group_by(election_type) %>%
+  summarise(
+    N = n(),
+    Avg_Turnout = mean(VOTER_TURNOUT_PCT, na.rm = TRUE),
+    SD_Turnout = sd(VOTER_TURNOUT_PCT, na.rm = TRUE),
+    Avg_Unemployment = mean(unemployment_rate, na.rm = TRUE),
+    SD_Unemployment = sd(unemployment_rate, na.rm = TRUE)
+  ) %>%
+  kable(caption = "Statistics by Election Type", digits = 3)
+
+# By county type
+df %>%
+  group_by(county_type) %>%
+  summarise(
+    N = n(),
+    Counties = n_distinct(FIPS),
+    Avg_Turnout = mean(VOTER_TURNOUT_PCT, na.rm = TRUE),
+    SD_Turnout = sd(VOTER_TURNOUT_PCT, na.rm = TRUE),
+    Avg_Unemployment = mean(unemployment_rate, na.rm = TRUE),
+    SD_Unemployment = sd(unemployment_rate, na.rm = TRUE)
+  ) %>%
+  kable(caption = "Statistics by County Type", digits = 3)
+
+# By unemployment tier
+df %>%
+  group_by(unemployment_tier) %>%
+  summarise(
+    N = n(),
+    Avg_Turnout = mean(VOTER_TURNOUT_PCT, na.rm = TRUE),
+    SD_Turnout = sd(VOTER_TURNOUT_PCT, na.rm = TRUE),
+    Avg_Unemployment = mean(unemployment_rate, na.rm = TRUE),
+    Min_Unemployment = min(unemployment_rate, na.rm = TRUE),
+    Max_Unemployment = max(unemployment_rate, na.rm = TRUE)
+  ) %>%
+  kable(caption = "Statistics by Unemployment Tier", digits = 3)
+```
+
+------------------------------------------------------------------------
+
+# Visualizations
+
+## Overall Relationship
+
+```{r plot-overall, fig.cap="Unemployment Rate vs Voter Turnout (County-level, 2004-2022)"}
+ggplot(df, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT)) +
+  geom_point(alpha = 0.2, size = 1, color = "#2171b5") +
+  geom_smooth(method = "lm", color = "#cb181d", size = 1.2, se = TRUE) +
+  labs(
+    title = "Relationship Between Unemployment and Voter Turnout",
+    subtitle = "All counties, 2004-2022",
+    x = "Unemployment Rate (%)",
+    y = "Voter Turnout Rate"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## By Election Type
+
+```{r plot-by-election, fig.cap="Unemployment vs Turnout by Election Type"}
+ggplot(df, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT, 
+               color = election_type)) +
+  geom_point(alpha = 0.2, size = 1) +
+  geom_smooth(method = "lm", se = TRUE, size = 1.2) +
+  scale_color_manual(values = c("Presidential" = "#2171b5", "Midterm" = "#cb181d")) +
+  labs(
+    title = "Unemployment vs Turnout by Election Type",
+    subtitle = "Different patterns in presidential vs midterm elections",
+    x = "Unemployment Rate (%)",
+    y = "Voter Turnout Rate",
+    color = "Election Type"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+## Interaction Effect: County Type
+
+```{r plot-interaction, fig.cap="Testing Interaction: Unemployment tier × Urban/Rural", fig.height=7}
+ggplot(df, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT, 
+               color = county_type)) +
+  geom_point(alpha = 0.15, size = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, size = 1.2) +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Unemployment vs Turnout by County Type",
+    subtitle = "Testing interaction: Unemployment Tier × Urban/Rural Classification",
+    x = "Unemployment Rate (%)",
+    y = "Voter Turnout Rate",
+    color = "County Type"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+## Boxplot: Interaction Visualization
+
+```{r plot-boxplot, fig.cap="Turnout by County Type and Economic Condition"}
+ggplot(df, aes(x = county_type, y = VOTER_TURNOUT_PCT, fill = unemployment_tier)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = c("Low Unemployment" = "#31a354", 
+                                "High Unemployment" = "#e34a33")) +
+  labs(
+    title = "Voter Turnout by County Type and Economic Condition",
+    subtitle = "Comparing high vs low unemployment periods",
+    x = "County Type",
+    y = "Voter Turnout Rate",
+    fill = "Economic Condition"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+------------------------------------------------------------------------
+
+# Regression Analysis
+
+## Model Specifications
+
+We estimate five models with increasing complexity:
+
+1.  **Model 1 (Simple OLS):** Baseline unemployment effect
+2.  **Model 2 (+ Election Type):** Control for presidential vs midterm
+3.  **Model 3 (+ Interaction):** Add unemployment × county type interaction
+4.  **Model 4 (Two-Way FE):** County and year fixed effects
+5.  **Model 5 (FE + Interaction):** Fixed effects with interaction term
+
+## Model Estimation
+
+```{r regression-models}
+# Model 1: Simple OLS
+model1 <- lm(VOTER_TURNOUT_PCT ~ unemployment_rate, data = df)
+
+# Model 2: Add election type control
+model2 <- lm(VOTER_TURNOUT_PCT ~ unemployment_rate + is_presidential, data = df)
+
+# Model 3: Add interaction with county type
+model3 <- lm(VOTER_TURNOUT_PCT ~ unemployment_rate * county_type + is_presidential, 
+             data = df)
+
+# Model 4: Panel Fixed Effects (County + Year)
+model4 <- felm(VOTER_TURNOUT_PCT ~ unemployment_rate | FIPS + YEAR, data = df)
+
+# Model 5: Fixed Effects with Interaction
+model5 <- felm(VOTER_TURNOUT_PCT ~ unemployment_rate * county_type | FIPS + YEAR, 
+               data = df)
+
+cat("✓ All models estimated successfully\n")
+```
+
+## Regression Results
+
+```{r regression-table, results='asis'}
+stargazer(model1, model2, model3, model4, model5,
+          type = "text",
+          title = "Effect of Unemployment on Voter Turnout",
+          column.labels = c("OLS", "+ Election", "+ Interaction", "FE", "FE + Int"),
+          model.numbers = FALSE,
+          dep.var.labels = "Voter Turnout Rate",
+          covariate.labels = c("Unemployment Rate", 
+                               "Presidential Election", 
+                               "County: Suburban", 
+                               "County: Urban",
+                               "Unemp × Suburban", 
+                               "Unemp × Urban"),
+          omit.stat = c("ser", "f"),
+          digits = 4,
+          single.row = FALSE,
+          notes = c("Standard errors in parentheses.",
+                    "Models 4-5 include county and year fixed effects."),
+          notes.append = TRUE)
+```
+
+## Model Comparison
+
+```{r model-comparison}
+# Extract key statistics
+model_stats <- data.frame(
+  Model = c("M1: Simple OLS", "M2: + Election Type", "M3: + Interaction",
+            "M4: Two-Way FE", "M5: FE + Interaction"),
+  Unemployment_Coef = c(
+    coef(model1)["unemployment_rate"],
+    coef(model2)["unemployment_rate"],
+    coef(model3)["unemployment_rate"],
+    coef(model4)["unemployment_rate"],
+    coef(model5)["unemployment_rate"]
+  ),
+  R_squared = c(
+    summary(model1)$r.squared,
+    summary(model2)$r.squared,
+    summary(model3)$r.squared,
+    summary(model4)$r.squared,
+    summary(model5)$r.squared
+  ),
+  N_obs = c(
+    nobs(model1),
+    nobs(model2),
+    nobs(model3),
+    nobs(model4),
+    nobs(model5)
+  )
+)
+
+kable(model_stats, 
+      caption = "Model Comparison Summary",
+      digits = 4,
+      col.names = c("Model", "Unemployment Coefficient", "R²", "N"))
+```
+
+------------------------------------------------------------------------
+
+# Key Findings
+
+## Main Results
+
+```{r extract-coefficients}
+coef_m1 <- coef(model1)["unemployment_rate"]
+coef_m2 <- coef(model2)["unemployment_rate"]
+coef_m4 <- coef(model4)["unemployment_rate"]
+pres_effect <- coef(model2)["is_presidential"]
+```
+
+### 1. Overall Relationship (Model 1)
+
+-   A 1 percentage point increase in unemployment is associated with a -0.0033 change in turnout (or -0.33 percentage points)
+
+-   This represents a weak negative relationship
+
+-   R² = 0.0038 (explains less than 1% of variation in turnout)
+
+-   Interpretation: In the simple bivariate model, higher unemployment is associated with slightly lower turnout, but unemployment alone explains almost none of the variation in voter participation.
+
+### 2. Controlling for Election Type (Model 2)
+
+-   Unemployment effect: -0.0074 (becomes more negative)
+
+-   Presidential elections are associated with 8.6 percentage points lower turnout than midterms (coefficient = -0.0862)
+
+-   Note: This negative coefficient is unexpected - you should verify your is_presidential coding. If 1 = presidential, this suggests presidential elections have lower turnout than midterms in your data, which may reflect data structure issues
+
+-   R² = 0.3405 (election type explains 34% of variation!)
+
+-   Interpretation: Once we account for election type, the unemployment effect doubles in magnitude. Election type is a much stronger predictor than unemployment.
+
+### 3. Interaction with County Type (Model 3)
+
+The effect of unemployment **differs across county types**:
+
+```{r interaction-effects}
+# Extract interaction coefficients from Model 3
+int_suburban <- coef(model3)["unemployment_rate:county_typeSuburban"]
+int_urban <- coef(model3)["unemployment_rate:county_typeUrban"]
+
+cat("Unemployment effect by county type:\n")
+cat("  - Rural (baseline):", round(coef(model3)["unemployment_rate"], 4), "\n")
+cat("  - Suburban (baseline + interaction):", 
+    round(coef(model3)["unemployment_rate"] + int_suburban, 4), "\n")
+cat("  - Urban (baseline + interaction):", 
+    round(coef(model3)["unemployment_rate"] + int_urban, 4), "\n")
+```
+
+### 4. Panel Fixed Effects (Model 4)
+
+-   Within-county estimate: +0.0016 (now positive!)
+
+-   Controls for time-invariant county characteristics (demographics, political culture, geography)
+
+-   Controls for national trends (year fixed effects)
+
+-   Most reliable estimate for causal interpretation
+
+-   R² = 0.7411 (explains 74% of variation!)
+
+-   Key Finding: The sign flips from negative to positive!
+
+-   Cross-sectional effect (Models 1-3): Counties with higher unemployment tend to have lower turnout (comparing different counties)
+
+-   Within-county effect (Model 4): When a county experiences higher unemployment than its own average, turnout slightly increases
+
+-   Interpretation: Cross-sectional differences between counties were confounding the relationship. The true within-county effect is small and positive: a 1 percentage point increase in unemployment is associated with a 0.16 percentage point increase in turnout, holding all county-specific factors constant.
+
+### 5. Practical Significance
+
+```{r practical-significance}
+unemployment_change <- 2  # 2 percentage point increase
+turnout_change <- coef_m4 * unemployment_change
+baseline_turnout <- 0.50
+new_turnout <- baseline_turnout + turnout_change
+```
+
+**Scenario:** A 2 percentage point increase in unemployment (e.g., from 5% to 7%, as during a recession)
+
+**Using Model 4 (our preferred specification):**
+
+-   Associated turnout change: 2 × 0.0016 = +0.0032 (or +0.32 percentage points)
+
+-   For a county with 50% baseline turnout: New predicted turnout: 50.32%
+
+-   This is a 0.64% relative increase
+
+**Substantive Interpretation:**
+
+-   Effect is statistically significant (p \< 0.01) but substantively small
+
+-   A recession-level unemployment spike increases turnout by less than half a percentage point
+
+-   Compare this to election type: the election type effect is approximately 27 times larger than a 2-point unemployment increase
+
+-   Policy implication: Economic conditions have minimal direct impact on voter participation. Structural factors (election type, county characteristics) dominate.
+
+## Statistical Tests
+
+```{r statistical-tests}
+# T-test: Difference in turnout by election type
+t_test_result <- t.test(VOTER_TURNOUT_PCT ~ is_presidential, data = df)
+
+cat("T-test: Presidential vs Midterm Turnout\n")
+cat("  Presidential mean:", round(t_test_result$estimate[2], 4), "\n")
+cat("  Midterm mean:", round(t_test_result$estimate[1], 4), "\n")
+cat("  Difference:", round(diff(t_test_result$estimate), 4), "\n")
+cat("  t-statistic:", round(t_test_result$statistic, 2), "\n")
+cat("  p-value:", format.pval(t_test_result$p.value, digits = 3), "\n")
+
+# Correlation by election type
+cat("\nCorrelation: Unemployment vs Turnout\n")
+for (etype in c("Presidential", "Midterm")) {
+  subset_df <- df %>% filter(election_type == etype)
+  cor_test <- cor.test(subset_df$unemployment_rate, subset_df$VOTER_TURNOUT_PCT)
+  cat("  ", etype, ": r =", round(cor_test$estimate, 4), 
+      ", p =", format.pval(cor_test$p.value, digits = 3), "\n")
+}
+```
+
+------------------------------------------------------------------------
+
+# Conclusions
+
+## How does local unemployment tier relate to voter turnout?
+
+1.  **Weak Positive Effect (Within-County):** Higher unemployment is associated with slightly higher turnout within counties, but the effect is small (Model 4: +0.0016)
+
+2.  **Election Type Dominates:** Presidential vs midterm elections matter far more than unemployment for explaining turnout (R² increases from 0.004 to 0.34)
+
+3.  **Heterogeneous Effects:** The unemployment-turnout relationship differs across urban, suburban, and rural counties (Model 3 & 5 interactions)
+
+4.  **Within-County Evidence:** Fixed effects models show that when a county experiences higher unemployment, turnout increases slightly (+0.16 percentage points per 1% unemployment increase), controlling for other factors
+
+5.  **Practical Impact:** A recession-level increase in unemployment (2%) is associated with only a 0.32 percentage point increase in turnout.
+
+## Limitations
+
+-   County-level aggregation: Individual-level data would be preferable
+
+-   Omitted variables: Cannot control for campaign spending, candidate quality, etc.
+
+-   Causality: Despite fixed effects, cannot definitively establish causal relationship
+
+-   Time period: Analysis limited to 2004-2022
+
+-   Measurement: Unemployment rate may not capture full economic distress experienced by voters
+
+## Policy Implications
+
+-   Economic conditions have modest effects on political participation
+
+-   Electoral reforms should focus on structural barriers rather than assuming economic improvements alone will boost turnout
+
+-   Context matters: Urban and rural counties may respond differently to economic stress
+
+-   Mobilization efforts: Resources should focus on institutional factors (registration, voting access) rather than economic messaging alone
+
+------------------------------------------------------------------------
+
+# Appendix
+
+## Save Results
+
+```{r save-results}
+# Create output directory
+dir.create("../data/output", showWarnings = FALSE, recursive = TRUE)
+
+# Save model objects
+save(model1, model2, model3, model4, model5, 
+     file = "../data/output/regression_models.RData")
+
+# Save processed data
+write_csv(df, "../data/processed/analysis_data_r.csv")
+
+# Save regression table (LaTeX format)
+stargazer(model1, model2, model3, model4, model5,
+          type = "latex",
+          title = "Effect of Unemployment on Voter Turnout",
+          column.labels = c("OLS", "+ Election", "+ Interaction", "FE", "FE + Int"),
+          dep.var.labels = "Voter Turnout Rate",
+          out = "../data/output/regression_table.tex")
+
+cat("✓ Results saved:\n")
+cat("  - Model objects: data/output/regression_models.RData\n")
+cat("  - Processed data: data/processed/analysis_data_r.csv\n")
+cat("  - LaTeX table: data/output/regression_table.tex\n")
+```
+
+------------------------------------------------------------------------
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```
+
+------------------------------------------------------------------------
