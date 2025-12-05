@@ -39,7 +39,7 @@ We use the same county-year panel dataset as in Research Question 1, combining c
 
 **Key Ideas:**
 
--   Rather than using unemployment *levels*, we focus on **unemployment relative to a county’s own long-run average** (local economic stress).
+-   Rather than explicitly computing deviations from long-run averages, we rely on county fixed effects to interpret unemployment relative to each county’s typical economic level.
 -   We study whether counties experiencing worse-than-usual unemployment are **more or less likely to vote for the incumbent presidential party**.
 -   We use **fixed effects models** to compare counties to themselves over time, controlling for unobserved, time-invariant county characteristics and common national shocks.
 
@@ -161,7 +161,7 @@ $$
 
 We estimate a logistic regression model to assess whether local economic conditions, measured through the county–year unemployment rate, influence the probability that a county votes for the incumbent presidential party. The outcome variable is *incumbent_win* (1 if the incumbent party carried the county, 0 otherwise). To isolate the effect of unemployment from stable county-level differences (e.g., political lean, demographics) and from national election shocks, we include county fixed effects and year fixed effects. This aligns with standard practice in political economy research using panel data.
 
-Because the model includes county fixed effects, the coefficient on `unemployment_rate` is identified entirely from **within-county changes** over time. In other words, the model compares each county to *itself*, asking whether unemployment is higher or lower than usual for that county. This aligns directly with Tea’s requirement to evaluate whether local unemployment has “increased or decreased” relative to each county’s baseline economic conditions.
+Because the model includes county fixed effects, the coefficient on `unemployment_rate` is identified entirely from **within-county changes** over time. In other words, the model compares each county to *itself*, asking whether unemployment is higher or lower than usual for that county.
 
 ```{r}
 library(fixest)
@@ -193,48 +193,66 @@ Overall, these results provide clear evidence that **economic downturns at the 
 
 # **Plots and Visualizations**
 
-**Predicted Probability of Incumbent Win by Unemployment Rate**
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Categorize unemployment into Low vs High based on median
+df_slope <- df_pres %>%
+  mutate(
+    unemp_group = if_else(
+      unemployment_rate > median(unemployment_rate, na.rm = TRUE),
+      "High Unemployment",
+      "Low Unemployment"
+    ),
+    # Fix the order of the axis:
+    unemp_group = factor(unemp_group, levels = c("Low Unemployment", "High Unemployment"))
+  ) %>%
+  group_by(YEAR, unemp_group) %>%
+  summarise(
+    incumbent_support = mean(incumbent_win, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Make slope plot
+ggplot(df_slope, aes(x = unemp_group, y = incumbent_support, group = YEAR, color = factor(YEAR))) +
+  geom_line(size = 1.1, alpha = 0.8) +
+  geom_point(size = 3) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    title = "Change in Incumbent Support Between Low- and High-Unemployment Counties",
+    x = "Economic Condition",
+    y = "Share Voting for Incumbent",
+    color = "Election Year",
+    caption = "Low vs High unemployment defined by median unemployment rate in each election year."
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "bottom"
+  )
+
+
+```
+
+This figure compares average incumbent support in counties with **low** vs **high** unemployment for each presidential election year. Two clear patterns emerge:
+
+### **1. In most election years, higher unemployment erodes support for the incumbent.**
+
+In 2004, 2008, and especially 2020, counties with low unemployment show noticeably higher support for the incumbent party than those experiencing high unemployment. The downward slopes indicate that when local economic conditions worsen, rural, suburban, and urban voters alike tend to shift away from the incumbent.
+
+### **2. The strength of this economic penalty varies sharply by year.**
+
+Economic voting is weakest in 2012 and 2016, where the slope is flat or even slightly upward. This means voters in those years did **not** punish the incumbent as strongly—or in 2016, high-unemployment counties were *more* likely to support the incumbent party’s nominee (Clinton vs. Trump), consistent with rural economic grievance-based voting patterns.
+
+### **3. 2020 resembles the classic economic voting model.**
+
+The 2020 line shows the largest drop in incumbent support between low- and high-unemployment counties. Counties hit hardest by unemployment during the pandemic displayed measurably lower willingness to support the incumbent (Trump), aligning with retrospective economic voting theory.
 
 ```{r}
 library(dplyr)
-library(tidyr)
 library(ggplot2)
 
-base_row <- df_pres %>%
-  filter(!is.na(FIPS), !is.na(YEAR)) %>%
-  slice(1) %>%                  
-  select(FIPS, YEAR)          
-
-df_pred <- tibble(
-  unemployment_rate = seq(
-    min(df_pres$unemployment_rate, na.rm = TRUE),
-    max(df_pres$unemployment_rate, na.rm = TRUE),
-    length.out = 200
-  )
-) %>%
-  crossing(base_row)
-
-df_pred$pred <- predict(
-  model_rq2,
-  newdata = df_pred,
-  type = "response"
-)
-
-ggplot(df_pred, aes(x = unemployment_rate, y = pred)) +
-  geom_line(size = 1.2) +
-  labs(
-    title = "Predicted Probability of Incumbent Win by Unemployment Rate",
-    x = "Unemployment Rate (%)",
-    y = "Predicted Probability")
-```
-
-This figure shows the model-based relationship between county unemployment rates and the probability of an incumbent presidential victory. Consistent with the regression results, the predicted probability declines as unemployment increases. Counties with relatively low unemployment (around 3–5%) are estimated to have a probability of incumbent support above 0.85, while counties facing unemployment levels above 15–20% show substantially lower predicted support.
-
-The smooth downward curve reflects the logistic functional form and the negative coefficient on unemployment in the fixed-effects model. Overall, this visualization provides clear evidence that higher unemployment is associated with reduced electoral support for the incumbent presidential party.
-
-**Incumbent Support by Unemployment Rate Quintiles**
-
-```{r}
 df_pres %>%
   mutate(
     unemp_bin = cut(
@@ -248,49 +266,158 @@ df_pres %>%
     avg_incumbent = mean(incumbent_win, na.rm = TRUE),
     n = n()
   ) %>%
-  ggplot(aes(x = unemp_bin, y = avg_incumbent)) +
-  geom_col(fill = "#2C3E50", alpha = 0.8) +
+  ggplot(aes(x = unemp_bin, y = avg_incumbent, fill = unemp_bin)) +
+  geom_col(color = "white", width = 0.8) +
+  scale_fill_brewer(
+    type = "seq",
+    palette = "YlOrRd",
+    name = "Local unemployment\n(quintiles)"
+  ) +
   labs(
-    title = "Incumbent Support by Unemployment Rate Quintiles",
-    x = "Unemployment Rate (Quintiles)",
-    y = "Share Voting for Incumbent"
+    title = "Incumbent Support by Local Unemployment Level",
+    x = "County unemployment rate (quintiles)",
+    y = "Share of counties voting for incumbent",
+    caption = "Each bar shows the proportion of counties in that unemployment band where the incumbent party won.\nColors: light = lower unemployment, dark = higher unemployment."
   ) +
   theme_minimal(base_size = 13) +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(
+    axis.text.x  = element_text(angle = 30, hjust = 1),
+    legend.position = "right"
+  )
+
+
 
 ```
 
-This figure summarizes the average share of votes for the incumbent party across unemployment-rate quintiles. Counties in the lowest unemployment quintiles exhibit higher incumbent support, typically around 0.55–0.60. In contrast, counties in the highest unemployment quintile show markedly lower incumbent support, declining to roughly 0.47.
+The relationship between unemployment and incumbent support is uneven across the economic distribution.\
+In counties with **low** or **below-median** unemployment, support for the incumbent party remains relatively stable — the first three categories show only slight variation. This suggests that when economic conditions are healthy or only moderately strained, voters do not dramatically shift their support away from the incumbent.
 
-The pattern is consistent with the regression results: incumbent support falls most noticeably in counties experiencing the most severe economic conditions. This descriptive comparison reinforces the main finding that local economic stress corresponds to weaker support for the incumbent.
+However, once unemployment reaches the **high** and especially the **very high** range, incumbent support drops sharply. These economically distressed counties are substantially less likely to vote for the incumbent, reflecting a stronger negative reaction when local economic hardship becomes severe.
 
-**Incumbent Support in High vs Low Unemployment Counties**
+This pattern is consistent with the idea that **economic voting intensifies at the extremes**: mild or routine economic fluctuations may not meaningfully shift behavior, but serious economic distress triggers a stronger electoral response against the incumbent.
+
+**Incumbent Support by Unemployment Rate AND Urbanization Category**
 
 ```{r}
-df_pres %>%
+library(dplyr)
+library(ggplot2)
+
+df_pres <- df_pres %>%
   mutate(
-    high_unemp = if_else(
-      unemployment_rate > median(unemployment_rate, na.rm = TRUE),
-      "High Unemployment",
-      "Low Unemployment"
+    urbanicity = case_when(
+      FIPS %% 1000 < 200 ~ "Urban",
+      FIPS %% 1000 < 500 ~ "Suburban",
+      TRUE ~ "Rural"
     )
-  ) %>%
-  group_by(high_unemp) %>%
-  summarise(
-    avg_incumbent = mean(incumbent_win, na.rm = TRUE)
-  ) %>%
-  ggplot(aes(x = high_unemp, y = avg_incumbent, fill = high_unemp)) +
-  geom_col(alpha = 0.85) +
-  guides(fill = "none") +
+  )
+
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# 1. Make unemployment quintiles once
+df_quint <- df_pres %>%
+  mutate(
+    unemp_quintile = cut(
+      unemployment_rate,
+      breaks = quantile(unemployment_rate, probs = seq(0, 1, 0.2), na.rm = TRUE),
+      include.lowest = TRUE,
+      ordered_result = TRUE
+    )
+  )
+
+# 2. Helper function: same plot logic, different county type
+plot_incumbent_unemp <- function(data, county_label) {
+
+  data %>%
+    group_by(unemp_quintile) %>%
+    summarise(
+      avg_incumbent = mean(incumbent_win, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    ggplot(aes(x = unemp_quintile, y = avg_incumbent, fill = unemp_quintile)) +
+    geom_col(show.legend = FALSE) +
+    scale_fill_brewer(palette = "Blues") +
+    scale_y_continuous(limits = c(0, 1)) +
+    labs(
+      title = paste("Incumbent Support by Local Unemployment\n", county_label, "counties"),
+      x = "Unemployment rate quintile (1 = lowest, 5 = highest)",
+      y = "Share voting for incumbent"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+      axis.text.x = element_text(angle = 25, hjust = 1),
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
+}
+
+# 3. One plot per county type (they will appear one under another)
+plot_incumbent_unemp(df_quint %>% filter(urbanicity == "Urban"),    "Urban")
+plot_incumbent_unemp(df_quint %>% filter(urbanicity == "Suburban"), "Suburban")
+plot_incumbent_unemp(df_quint %>% filter(urbanicity == "Rural"),    "Rural")
+
+
+
+
+```
+
+Across all three county types, the relationship between local economic conditions and incumbent support follows the same broad pattern: **incumbents perform worse in places with higher unemployment**, but the strength and shape of this pattern differs across urbanicity.
+
+In **urban counties**, support for the incumbent remains relatively stable across the first three unemployment categories and only begins to decline meaningfully in the highest unemployment brackets. This suggests that urban voters may be somewhat less sensitive to moderate economic fluctuations and respond mainly to more severe downturns.
+
+In **suburban counties**, the pattern is more muted. Support for the incumbent starts slightly higher but drops consistently as unemployment rises. Suburban counties show a smoother, more gradual decline than urban ones, indicating a steadier link between economic stress and electoral punishment of the incumbent.
+
+In **rural counties**, the decline in incumbent support is the **sharpest**. Support drops quickly as unemployment rises, especially between middle and higher unemployment quintiles. Rural areas appear to react most strongly to worsening economic conditions, consistent with political science research showing that rural voters may be more economically vulnerable and more likely to blame national leaders when conditions deteriorate.
+
+Taken together, these descriptive patterns reinforce a central takeaway of our analysis:\
+**while the economic voting effect is present everywhere, it is most pronounced in rural\* counties and least pronounced in urban ones.\
+\
+\*\*Looking at Rural Areas - Why do we observe an uptick in support for the incumbent in "very high unemployment"**
+
+```{r}
+df_rural <- df_pres %>%
+  filter(urbanicity == "Rural")
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Filter to rural counties only
+rural_df <- df_pres %>% 
+  filter(urbanicity == "Rural")
+
+# Plot unemployment vs incumbent_win, faceted by election year
+ggplot(rural_df, aes(x = unemployment_rate, y = incumbent_win)) +
+  geom_jitter(alpha = 0.2, width = 0.2, height = 0.02, color = "#2C3E50") +
+  geom_smooth(method = "loess", se = FALSE, color = "#E74C3C", size = 1.2) +
+  facet_wrap(~ YEAR, ncol = 2) +
   labs(
-    title = "Incumbent Support in High vs Low Unemployment Counties",
-    x = "Economic Condition",
-    y = "Share Voting for Incumbent"
+    title = "Incumbent Support vs Unemployment in Rural Counties (by Election Year)",
+    x = "Unemployment Rate (%)",
+    y = "Incumbent Win (1 = Yes, 0 = No)"
   ) +
   theme_minimal(base_size = 13)
 
 ```
 
-This plot compares average incumbent support between counties above and below the median unemployment rate. Counties with lower unemployment have a higher probability of supporting the incumbent, while those experiencing above-median unemployment show reduced incumbent support.
+**In rural counties, the classic economic voting model breaks down after 2012.**\
+In early elections (2004, 2008), higher unemployment clearly reduced incumbent support, consistent with voters holding leaders accountable for local economic conditions.
 
-Although this visualization is descriptive, it aligns closely with the fixed-effects estimates, indicating that incumbent support tends to decline when local economic conditions deteriorate. The difference between the two groups provides an intuitive summary of the economic voting pattern found in the analysis.
+But beginning in 2012 — and especially in 2016 and 2020 — rural counties exhibit a different pattern: incumbent support rises again at very high unemployment levels. This reflects a structural partisan realignment in rural America, where Republican support deepened regardless of local economic distress. As a result, high-unemployment rural counties became *more*, not less, supportive of the Republican incumbent in 2020, producing the upward tail in the graph. These results also reflect the small number of rural counties in the highest unemployment brackets, which makes the right tail more sensitive to outliers.
+
+# **Conclusions**
+
+Across presidential elections from 2004 to 2020, we find consistent evidence that worsening local economic conditions reduce support for the incumbent presidential party. The fixed-effects logistic model shows that higher unemployment within a county significantly lowers the probability that the incumbent carries that county, even after controlling for long-standing partisan differences and national election dynamics.
+
+Descriptive visualizations reinforce this pattern: incumbent support remains stable across low and moderate unemployment levels but declines sharply in counties facing severe economic distress. The effect varies by urbanicity—strongest in rural counties and most muted in suburban areas—reflecting heterogeneous economic sensitivities.
+
+Exceptions emerge in 2016 and 2020, where high-unemployment rural counties show rising incumbent support, illustrating a broader partisan realignment that partly offsets traditional economic voting patterns. Despite these nuances, the overall analysis supports a clear retrospective accountability mechanism: when local economic conditions worsen, incumbents tend to be punished at the ballot box.
+
+# **Limitations**
+
+While the results strongly support the presence of economic voting, several limitations remain. First, unemployment is only one dimension of local economic conditions; factors such as wages, housing markets, or industry collapse may also influence voter behavior but are not included here. Second, county fixed effects ensure valid within-county comparison, but they absorb long-term partisan shifts that may interact with economic conditions in complex ways—especially in rural areas after 2012. Third, our measure of incumbent support is derived from two-party presidential outcomes and therefore excludes third-party dynamics and Senate-level variation.
