@@ -46,11 +46,8 @@ We use the same county-year panel dataset as in Research Question 1, combining c
 **Key Variables (RQ2):**
 
 -   **Outcome:** `incumbent_win` — indicator = 1 if the county votes for the incumbent presidential party, 0 otherwise\
-<<<<<<< HEAD
+
 -   **Predictor:** `unemployment_rate` — interpreted through county fixed effects, which identify the impact of **within-county changes** in unemployment (i.e., whether unemployment has increased or decreased relative to each county’s usual level)
-=======
--   **Predictor:** `unemp_change` — county unemployment rate minus the county’s historical mean unemployment
->>>>>>> f9e783686a514250f7df58ebc69516285c594cd7
 
 **Controls / Structure:**
 
@@ -60,15 +57,9 @@ We use the same county-year panel dataset as in Research Question 1, combining c
 
 **The Core Model**
 
-<<<<<<< HEAD
 $$
 \text{logit}\!\left( \Pr(\text{incumbent_win}_{c,y} = 1) \right)= \beta \cdot \text{unemployment_rate}_{c,y}+ \alpha_c + \gamma_y + \varepsilon_{c,y}
 $$
-=======
-logit(Pr\[incumbent_winc,y​=1\])=β⋅unemployment_ratec,y​+αc​+γy​+ϵc,y​
-
-Where:
->>>>>>> f9e783686a514250f7df58ebc69516285c594cd7
 
 # Data Preparation
 
@@ -126,7 +117,6 @@ df <- df %>%
     )
   )
 
-
 ```
 
 ```{r}
@@ -136,7 +126,6 @@ df <- df %>%
   mutate(
     incumbent_win = if_else(winner_party == incumbent_party, 1, 0)
   )
-
 
 ```
 
@@ -149,16 +138,7 @@ head(df %>% select(YEAR, PRES_DEM_VOTES, PRES_REP_VOTES, winner_party, incumbent
 
 ```{r}
 #Keep only presidential election years
-<<<<<<< HEAD
-=======
 
-df_pres <- df %>% filter(YEAR %in% c(2000, 2004, 2008, 2012, 2016, 2020))
-
-
-```
-
-```{r}
->>>>>>> f9e783686a514250f7df58ebc69516285c594cd7
 library(dplyr)
 
 df_pres <- df %>%
@@ -175,7 +155,6 @@ head(df_pres %>% select(YEAR, FIPS, incumbent_win, unemployment_rate))
 
 # **Model Specification**
 
-<<<<<<< HEAD
 $$
 \text{logit}\!\left( \Pr(\text{incumbent_win}_{c,y} = 1) \right)= \beta \cdot \text{unemployment_rate}_{c,y}+ \alpha_c + \gamma_y + \varepsilon_{c,y}
 $$
@@ -186,21 +165,10 @@ Because the model includes county fixed effects, the coefficient on `unemploymen
 
 ```{r}
 library(fixest)
-=======
-logit(Pr\[incumbent_winc,y​=1\])=β⋅unemployment_ratec,y​+αc​+γy​+ϵc,y​.
-
-We estimate a logistic regression model to assess whether local economic conditions, measured through the county–year unemployment rate, influence the probability that a county votes for the incumbent presidential party. The outcome variable is *incumbent_win* (1 if the incumbent party carried the county, 0 otherwise). To isolate the effect of unemployment from stable county-level differences (e.g., political lean, demographics) and from national election shocks, we include county fixed effects and year fixed effects. This aligns with standard practice in political economy research using panel data.
-
-```{r}
-install.packages("fixest")  
-library(fixest)
-
->>>>>>> f9e783686a514250f7df58ebc69516285c594cd7
 ```
 
 ```{r}
 #Fixed Logistic Model
-
 model_rq2 <- feglm(
   incumbent_win ~ unemployment_rate | FIPS + YEAR,
   family = binomial(link = "logit"),
@@ -211,7 +179,6 @@ model_rq2 <- feglm(
 
 ```{r}
 #Model Summary
-
 summary(model_rq2)
 
 ```
@@ -226,7 +193,6 @@ Overall, these results provide clear evidence that **economic downturns at the 
 
 # **Plots and Visualizations**
 
-<<<<<<< HEAD
 **Predicted Probability of Incumbent Win by Unemployment Rate**
 
 ```{r}
@@ -259,25 +225,8 @@ ggplot(df_pred, aes(x = unemployment_rate, y = pred)) +
   labs(
     title = "Predicted Probability of Incumbent Win by Unemployment Rate",
     x = "Unemployment Rate (%)",
-    y = "Predicted Probability"
-=======
-```{r}
-ggplot(df_pres, aes(x = unemployment_rate, y = incumbent_win)) +
-  geom_jitter(height = 0.05, width = 0, alpha = 0.25, color = "#2C3E50") +
-  geom_smooth(method = "glm", 
-              method.args = list(family = "binomial"),
-              color = "#E74C3C", 
-              se = TRUE) +
-  labs(
-    title = "Incumbent Victory vs. County Unemployment Rate",
-    x = "Unemployment Rate (%)",
-    y = "Probability of Incumbent Win"
->>>>>>> f9e783686a514250f7df58ebc69516285c594cd7
-  ) +
-  theme_minimal(base_size = 13)
-
+    y = "Predicted Probability")
 ```
-<<<<<<< HEAD
 
 This figure shows the model-based relationship between county unemployment rates and the probability of an incumbent presidential victory. Consistent with the regression results, the predicted probability declines as unemployment increases. Counties with relatively low unemployment (around 3–5%) are estimated to have a probability of incumbent support above 0.85, while counties facing unemployment levels above 15–20% show substantially lower predicted support.
 
