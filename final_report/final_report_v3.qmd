@@ -4,13 +4,6 @@ subtitle: "Final Report – STA 702 Statistical Analysis Project"
 author: "Diwas Purin, Tony Ngari, Tea Tafaj, Xinhao Zhang"
 date: today
 format: 
-  html:
-    toc: true
-    toc-depth: 3
-    theme: cosmo
-    code-fold: true
-    code-tools: true
-    self-contained: true
   pdf:
     documentclass: article
     geometry: margin=1in
@@ -315,8 +308,11 @@ $$ \text{Turnout}_{it} = \beta_1 \text{Unemployment}_{it} + \beta_2 (\text{Unemp
 # Load the saved model objects from the analysis pipeline
 load("../data/output/regression_models.RData")
 
+# Determine output format for stargazer
+table_type <- ifelse(knitr::is_latex_output(), "latex", "html")
+
 stargazer(model_full,
-          type = "html", # Use 'latex' if rendering to PDF, 'html' for HTML
+          type = table_type,
           title = "Effect of Unemployment on Voter Turnout (Fixed Effects Model)",
           model.numbers = FALSE,
           dep.var.labels = "Voter Turnout Rate",
@@ -330,7 +326,8 @@ stargazer(model_full,
           notes = c("Standard errors in parentheses.",
                     "Model includes county and year fixed effects.",
                     "Reference category: Rural counties."),
-          notes.append = TRUE)
+          notes.append = TRUE,
+          header = FALSE)
 ```
 
 ## 6. Supplementary Figures
