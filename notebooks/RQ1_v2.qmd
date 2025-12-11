@@ -4,6 +4,11 @@ subtitle: "Research Question 1: How does local Unemployment tier relate to voter
 author: "Statistical Analysis - STA 702"
 date: today
 format: 
+  pdf:
+    documentclass: article
+    geometry: margin=1in
+    fontsize: 11pt
+    toc: true
   html:
     toc: true
     toc-depth: 3
@@ -11,10 +16,6 @@ format:
     code-tools: true
     theme: cosmo
     self-contained: true
-  pdf:
-    documentclass: article
-    geometry: margin=1in
-    fontsize: 11pt
 editor: visual
 ---
 
