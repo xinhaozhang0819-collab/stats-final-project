@@ -1,0 +1,379 @@
+---
+title: "Economic Downturn, Turnout, and Incumbent Support"
+subtitle: "Final Report – STA 702 Statistical Analysis Project"
+author: "Diwas Purin, Tony Ngari, Tea Tafaj, Xinhao Zhang"
+date: today
+format: 
+  pdf:
+    documentclass: article
+    geometry: margin=1in
+    fontsize: 11pt
+editor: visual
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 5.5,
+  dpi = 300
+)
+
+library(tidyverse)
+library(lfe)
+library(fixest)
+library(stargazer)
+library(knitr)
+library(gridExtra)
+
+theme_set(theme_minimal(base_size = 12))
+
+# load merged panel
+df <- read_csv("../data/processed/merged_voting_unemployment_complete.csv", show_col_types = FALSE)
+
+# --- RQ1 Data Prep ---
+df_rq1 <- df %>%
+  filter(
+    VOTER_TURNOUT_PCT > 0,
+    !is.na(VOTER_TURNOUT_PCT),
+    !is.na(unemployment_rate),
+    VOTER_TURNOUT_PCT <= 1.0
+  ) %>%
+  mutate(
+    # Election type
+    is_presidential = ifelse(YEAR %% 4 == 0, 1, 0),
+    election_type   = ifelse(is_presidential == 1, "Presidential", "Midterm"),
+    
+    # Unemployment tiers
+    unemp_mean   = mean(unemployment_rate, na.rm = TRUE),
+    unemp_sd     = sd(unemployment_rate,  na.rm = TRUE),
+    unemp_zscore = (unemployment_rate - unemp_mean) / unemp_sd,
+    
+    unemployment_tier = case_when(
+      unemp_zscore < -1.0 ~ "Very Low (< -1 SD)",
+      unemp_zscore < -0.5 ~ "Low (-1 to -0.5 SD)",
+      unemp_zscore <  0.5 ~ "Medium (-0.5 to 0.5 SD)",
+      unemp_zscore <  1.0 ~ "High (0.5 to 1 SD)",
+      TRUE                ~ "Very High (> 1 SD)"
+    ),
+    unemployment_tier = factor(
+      unemployment_tier,
+      levels = c("Very Low (< -1 SD)", "Low (-1 to -0.5 SD)", "Medium (-0.5 to 0.5 SD)", "High (0.5 to 1 SD)", "Very High (> 1 SD)"),
+      ordered = TRUE
+    ),
+    
+    # Standardized unemployment
+    unemployment_std = (unemployment_rate - mean(unemployment_rate)) / sd(unemployment_rate),
+    
+    # County type
+    county_type = case_when(
+      CVAP > 50000 ~ "Urban",
+      CVAP > 10000 ~ "Suburban",
+      TRUE         ~ "Rural"
+    )
+  )
+
+# --- RQ2 Data Prep ---
+incumbent_table <- tibble(
+  YEAR = c(2000, 2004, 2008, 2012, 2016, 2020),
+  incumbent_party = c("DEM", "REP", "REP", "DEM", "DEM", "REP")
+)
+
+df_rq2 <- df %>%
+  left_join(incumbent_table, by = "YEAR") %>%
+  mutate(
+    winner_party = case_when(
+      PRES_DEM_VOTES > PRES_REP_VOTES ~ "DEM",
+      PRES_REP_VOTES > PRES_DEM_VOTES ~ "REP",
+      TRUE                            ~ NA_character_
+    ),
+    incumbent_win = if_else(winner_party == incumbent_party, 1, 0)
+  ) %>%
+  filter(
+    YEAR %in% c(2000, 2004, 2008, 2012, 2016, 2020),
+    !is.na(incumbent_win),
+    !is.na(unemployment_rate)
+  ) %>%
+  mutate(
+    urbanicity = case_when(
+      FIPS %% 1000 < 200 ~ "Urban",
+      FIPS %% 1000 < 500 ~ "Suburban",
+      TRUE               ~ "Rural")
+  )
+```
+
+# Executive Summary
+
+Local economic conditions influence both *who votes* and *which party voters support*, but in very different ways.\
+Using county-level data from 2000–2022, we examine how changes in unemployment relate to **voter turnout** and **support for the incumbent presidential party**.
+
+\
+Across election cycles, turnout is shaped primarily by election type and stable county characteristics. Local economic downturns have only a weak and modest effect: when unemployment rises within a county, turnout increases slightly, but the change is small. Rural, suburban, and urban counties show different patterns, yet the practical impact of unemployment on participation remains limited.
+
+\
+In contrast, deteriorating local economic conditions meaningfully reduce support for the incumbent presidential party. Counties experiencing worse-than-usual unemployment are less likely to vote for the president’s party, even after accounting for long-standing political differences and national election dynamics. This economic penalty is strongest in rural counties and most muted in suburban and urban areas.\
+Recent elections, however, reveal exceptions—some economically distressed rural counties continued supporting Republican incumbents—reflecting broader partisan realignment.
+
+**Overall Insight:** Economic downturns do little to alter *who turns out*, but they substantially shape *how counties vote*. The clearest pattern is retrospective accountability: when local economic conditions worsen, incumbents generally face electoral punishment.
+
+\newpage
+
+# Stakeholder
+
+The primary stakeholders for this memo are campaign strategists and political analysts.
+
+The objective is to enhance their understanding of the following three items.
+
+1.  Whether local economic downturns mobilize new voters to the polls (Turnout).
+2.  Whether voters consistently punish incumbents for local economic pain (Vote Choice).
+3.  How these patterns differ across Rural, Suburban, and Urban battlegrounds to optimize resource allocation.
+
+The memo provides high-level insights to guide campaign **resource allocation**, **geographic targeting**, and **message strategy**.\
+All technical specifications, modeling details, and diagnostics are deferred to the Technical Appendix.
+
+# Background and Motivation
+
+Economic conditions shape political behavior in multiple ways. When local economies weaken, some voters who typically participate inconsistently may become more engaged, either to express dissatisfaction or to influence change. At the same time, voters often evaluate the incumbent party based on how well they believe the economy is performing, rewarding improvement and penalizing downturns.
+
+Most research has focused on national-level trends, but economic conditions vary widely across places. This project examines whether *local* labor-market changes, specifically rising unemployment within a county, affect two outcomes at the county level: **voter turnout** and **support for the incumbent presidential party**. Understanding these local dynamics can help campaigns and policymakers anticipate how economic stress may influence electoral behavior across different types of communities.
+
+# Data Description
+
+Our analysis uses a county-level dataset combining data from the **Inter-university Consortium for Political and Social Research (ICPSR)** and the **Bureau of Labor Statistics (BLS)**:
+
+-   **General election turnout** for all U.S. counties from 2004–2022.
+-   **Presidential election results**, used to determine whether the incumbent party carried each county.
+-   **Local economic conditions**, measured through county-year unemployment rates.
+-   **County classifications** (urban, suburban, rural), constructed using population and voting-eligible population indicators to assess heterogeneous responses.
+
+The dataset spans more than 20 years of election cycles and includes both presidential and midterm elections.\
+Details on data construction, variable definitions, merging procedures, and coding steps appear in the Technical Appendix.
+
+\newpage
+
+# Research Question 1 Key Findings
+
+**RQ1:** *How does local unemployment relate to voter turnout in U.S. elections at the county level?*
+
+-   **Interaction Effects are Significant:** The relationship between unemployment and voter turnout differs meaningfully across rural, suburban, and urban counties, confirming that local context shapes how communities respond to economic stress.
+-   **Modest Substantive Impact:** While statistically significant, the effects are small. Even under recession-like conditions (a 2% increase in unemployment), predicted turnout shifts remain below 0.5 percentage points across all county types.
+-   **Rural Baseline:** In rural counties (reference group), a 1% rise in unemployment is linked to a negligible increase in turnout (\~0.04 percentage points), reflecting the stability of participation in these areas.
+-   **Urban and Suburban Response:** Urban and suburban counties show slightly stronger positive responses (\<0.25 percentage points per 1% increase), potentially reflecting greater mobilization capacity or organizational infrastructure.
+-   **Offsetting Mechanisms:** The weak aggregate relationship likely reflects opposing forces; economic hardship can both mobilize voters seeking change and discourage those who feel politically disconnected, leading to near-zero net effects on turnout.
+-   **Broader Interpretation:** Local downturns appear to influence ***how*** citizens vote more than ***whether*** they vote. The relative stability of turnout, paired with shifts in incumbent support (explored in second research question), suggests that voters channel economic frustration through **choice** rather than **withdrawal** from participation.
+
+# Research Question 2 Key Findings
+
+**RQ2:** *Does local economic downturn affect the probability that a county supports the incumbent presidential party?*
+
+-   **Local economic downturns clearly reduce support for the incumbent presidential party.** When unemployment in a county is higher than usual for that county, the incumbent is noticeably less likely to carry it, even after accounting for long-standing political differences and overall national trends.
+-   **The effect is concentrated in places facing serious economic distress.** At low and moderate unemployment levels, incumbent support changes little, but in counties with high and especially very high unemployment, support for the incumbent drops sharply.
+-   **Rural counties are the most sensitive to local economic conditions.** Across the unemployment distribution, rural areas show the largest declines in incumbent support as unemployment rises, while the relationship is more muted in suburban and urban counties.
+-   **Recent elections reveal important exceptions.** In 2016 and 2020, some high-unemployment rural counties actually showed **higher** support for the Republican incumbent, reflecting a broader partisan realignment in which party loyalty can override local economic pain.
+-   **Overall, the pattern is consistent with retrospective economic voting.** Voters generally punish incumbents when local economic conditions worsen, but this accountability mechanism is tempered in places where partisan identities have become especially strong.
+
+\newpage
+
+# Policy Implications
+
+-   Economic conditions play a **limited** role in shaping voter turnout but have a clearer impact on support for the incumbent presidential party, especially when unemployment rises.
+
+-   Campaigns should target **economic messaging** toward counties experiencing severe distress, with particular attention to **rural areas**, which are most responsive to worsening conditions.
+
+-   Electoral strategies should also recognize that urban, suburban, and rural counties **react differently** to economic stress, and places undergoing partisan realignment may require alternative communication approaches.
+
+-   Mobilization efforts will remain more effective when focused on **structural and institutional factors**, such as registration and voting access, rather than relying solely on economic improvements to boost participation.
+
+# Limitations
+
+-   **Aggregate-Level Data:** Our analysis relies on county-level data, which cannot capture individual-level voting behavior or the psychological mechanisms driving turnout and vote choice. Ecological correlations may differ from individual motivations.
+
+-   **Scope of Economic Indicators:** Unemployment represents only one dimension of local economic distress. Other relevant factors, such as wage stagnation, inflation, cost of living, job quality, and industry decline, may also influence electoral behavior but are not captured here.
+
+-   **Measurement Timing:** Annual unemployment averages may not align precisely with voters’ perceived or most salient economic experiences, particularly when job losses occur late in an election cycle.
+
+-   **Partisan Realignment Effects:** County fixed effects control for stable political tendencies but cannot fully account for long-term partisan realignment, especially the shifting rural-urban divide after 2012, which may confound the estimated relationship between economic stress and vote choice.
+
+-   **Heterogeneity Across Elections:** The model pools multiple election years, implicitly assuming that economic responsiveness is similar across contexts. Differences in national political climate, incumbents’ visibility, and salient issues (e.g., COVID-19 in 2020) may moderate the strength of economic effects.
+
+-   **Causal Interpretation Limits:** While the fixed-effects design isolates within-county variation, it cannot fully establish causality. Local unemployment may correlate with unobserved shocks, such as demographic change or policy interventions, that also affect political behavior.
+
+-   **Generalizability:** Results may generalize best to national-level U.S. contexts and may differ under state-specific economic conditions, local governance structures, or midterm election dynamics.
+
+All methodological limitations, robustness checks, and model diagnostics are documented in the Technical Appendix.
+
+\newpage
+
+# Appendix
+
+## 1. Data Sources and Construction
+
+We construct a county–year panel dataset by merging turnout, presidential election results, and local unemployment data.
+
+-   **Turnout data:** County-level general election turnout for U.S. counties (2004–2022).
+-   **Presidential election results:** Democratic and Republican vote totals, used to construct `winner_party` and `incumbent_party`.
+-   **Local economic conditions:** County unemployment rates from the Bureau of Labor Statistics (BLS).
+-   **County classifications:** Urban / Suburban / Rural categories based on county population / voting-eligible population.
+-   **Time period:**
+    -   **Turnout analysis (RQ1):** 2004–2022
+    -   **Incumbent support (RQ2):** Presidential elections in 2000, 2004, 2008, 2012, 2016, 2020
+
+\newpage
+
+## 2. Variable Definitions
+
+-   **Voter Turnout Rate:** The proportion of the citizen voting-age population (CVAP) that cast a ballot.
+
+-   **Unemployment Rate:** The percentage of the labor force that is unemployed (annual average).
+
+-   **Unemployment Tier:** Statistical classification of unemployment severity (low / medium / high) based on historical deviations.
+
+-   **Election Type:** Indicator for presidential vs. midterm elections.
+
+-   **County Type:** Classification as Urban, Suburban, or Rural based on voting-age population size.
+
+-   **Incumbent Win:** Indicator (1/0) if the county voted for the incumbent presidential party.
+
+-   **Winner Party:** The party (Democrat/Republican) that received the most votes in the county.
+
+-   **Incumbent Party:** The party holding the presidency at the time of the election.
+
+-   `FIPS`: County identifier for fixed effects.
+
+\newpage
+
+## 3. Cleaning and Processing Workflow
+
+1.  Import data and harmonize county-level identifiers.\
+2.  Merge turnout with unemployment data.\
+3.  Merge presidential election results with unemployment.\
+4.  Create derived variables (tiers, incumbent indicators, county type).\
+5.  Filter to analysis subsets:
+    -   All general elections for RQ1
+    -   Only presidential elections for RQ2\
+6.  Handle missing/unreliable entries (NA removal, turnout = 0).\
+7.  Convert categorical variables to factors required for FE models.
+
+\newpage
+
+## 4. Modeling Procedures
+
+### **RQ1: Turnout and Local Unemployment**
+
+**Primary Model: Fixed Effects with Interaction**
+
+We estimate a **Two-Way Fixed Effects (TWFE)** model to isolate the within-county effect of unemployment on turnout, controlling for time-invariant county characteristics and national election trends.
+
+$$ \text{Turnout}_{it} = \beta_1 \text{Unemployment}_{it} + \beta_2 (\text{Unemployment}_{it} \times \text{CountyType}_i) + \alpha_i + \delta_t + \epsilon_{it} $$
+
+-   $\alpha_i$ (County Fixed Effects): Controls for stable characteristics like demographics, political culture, and geography.
+-   $\delta_t$ (Year Fixed Effects): Controls for national waves (e.g., 2008 surge, 2014 slump).
+-   **Interaction Term:** Allows the effect of unemployment to vary by Rural (Reference), Suburban, and Urban classifications.
+-   **F-Test:** Conducted to formally test if the interaction terms significantly improve model fit compared to a base model.
+
+### **RQ2: Economic Downturn and Incumbent Support**
+
+**Fixed-effects logistic regression:**\
+
+-   County FE absorb time-invariant political traits.
+-   Year FE absorb national shocks (economy-wide trends, incumbency advantage cycles).
+-   Identification relies on *within-county* changes.
+
+\newpage
+
+## 5. Regression Tables
+
+::: {style="page-break-after: always;"}
+:::
+
+### Table 1: Effect of Unemployment on Voter Turnout (RQ1)
+
+```{r regression-table-rq1, results='asis'}
+# Load the saved model objects from the analysis pipeline
+load("../data/output/regression_models.RData")
+
+# Determine output format for stargazer
+table_type <- ifelse(knitr::is_latex_output(), "latex", "html")
+
+stargazer(model_full,
+          type = table_type,
+          title = "Effect of Unemployment on Voter Turnout (Fixed Effects Model)",
+          model.numbers = FALSE,
+          dep.var.labels = "Voter Turnout Rate",
+          covariate.labels = c("Unemployment Rate (Rural baseline)", 
+                               "Unemp × Suburban", 
+                               "Unemp × Urban"),
+          omit.stat = c("ser"),
+          digits = 4,
+          single.row = FALSE,
+          keep.stat = c("n", "rsq", "adj.rsq"),
+          notes = c("Standard errors in parentheses.",
+                    "Model includes county and year fixed effects.",
+                    "Reference category: Rural counties."),
+          notes.append = TRUE,
+          header = FALSE)
+```
+
+\newpage
+
+## 6. Supplementary Figures
+
+### Figure S1: Turnout Trends by Election Type
+
+```{r plot-by-election, fig.cap="Turnout is driven more by election cycle than economic conditions."}
+ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT, 
+               color = election_type)) +
+  geom_point(alpha = 0.1, size = 1) +
+  geom_smooth(method = "lm", se = TRUE, size = 1.2) +
+  scale_color_manual(values = c("Presidential" = "#2171b5", "Midterm" = "#cb181d")) +
+  labs(
+    title = "Unemployment vs Turnout by Election Type",
+    subtitle = "Analysis Period: 2004-2022",
+    x = "Unemployment Rate (%)",
+    y = "Voter Turnout Rate",
+    color = "Election Type"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+### Figure S2: Distribution of Turnout by Economic Condition
+
+```{r plot-boxplot, fig.cap="Turnout distributions are stable across economic tiers."}
+ggplot(df_rq1, aes(x = county_type, y = VOTER_TURNOUT_PCT, fill = unemployment_tier)) +
+  geom_boxplot(alpha = 0.8, outlier.size = 0.5) +
+  scale_fill_viridis_d(option = "D", begin = 0.2, end = 0.8, name = "Unemployment Tier") +
+  labs(
+    title = "Voter Turnout Distribution by County Type",
+    subtitle = "Comparing turnout across different levels of economic stress",
+    x = "County Type",
+    y = "Voter Turnout Rate"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "bottom")
+```
+
+### Figure S3: Unemployment vs Turnout by County Type
+
+```{r plot-interaction, fig.cap="Interaction Effect: The relationship between unemployment and turnout varies by county type."}
+ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT, 
+               color = county_type)) +
+  geom_point(alpha = 0.1, size = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, size = 1.2) +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Unemployment vs Turnout by County Type",
+    subtitle = "Interaction: Unemployment Rate × Urban/Rural Classification",
+    x = "Unemployment Rate (%)",
+    y = "Voter Turnout Rate",
+    color = "County Type"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
