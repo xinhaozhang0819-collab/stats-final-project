@@ -115,7 +115,6 @@ df_rq2 <- df %>%
   )
 ```
 
-
 # Executive Summary
 
 Local economic conditions influence both *who votes* and *which party voters support*, but in very different ways.\
@@ -244,19 +243,11 @@ We construct a county–year panel dataset by merging turnout, presidential elec
 **Data processing workflow (summary):**\
 We merge turnout, unemployment, and election results by county (`FIPS`) and year, remove missing or unrealistic observations (for example, turnout equal to zero), restrict to presidential years for RQ2, and construct analysis variables used in the models (see A2).
 
-
-
 **Cleaning and Sample Definition for RQ1 (Turnout)**
-
-
 
 **Construction of Incumbent Support for RQ2**
 
-
-
 **County Urbanicity Classification**
-
-
 
 ## 2. Variable Definitions
 
