@@ -142,10 +142,6 @@ All technical specifications, modeling details, and diagnostics are deferred to 
 # Background and Motivation
 
 Political theory suggests that populations differ in their typical level of political engagement. Almond and Verba’s classic “Civic Culture” framework describes a participation pyramid in which the largest group consists of disengaged citizens (“parochials”), followed by moderately involved voters (“subjects”), and finally a small group of highly engaged participants. In many systems, this bottom tier — often described as a “silent majority” — remains politically inactive unless economic or social conditions deteriorate. Under worsening economic conditions, previously uninvolved citizens may become mobilized to vote, either to punish the incumbent or express dissatisfaction with the status quo. This idea motivates our investigation of whether local economic downturns, measured through rising unemployment, affect political participation and incumbent electoral performance at the county level.\
-\
-Almond, Gabriel A., and Sidney Verba. *The Civic Culture: Political Attitudes and Democracy in Five Nations.* Princeton University Pre
-
-Berelson, Bernard R., Paul F. Lazarsfeld, and William N. McPhee. *Voting: A Study of Opinion Formation in a Presidential Campaign.* University of Chicago Press, 1954
 
 # Data Description
 
@@ -437,7 +433,7 @@ ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT,
   theme(legend.position = "bottom")
 ```
 
-### **Figure S4: Incumbent support vs local unemployment** 
+### **Figure S4: Incumbent support vs local unemployment**
 
 ```{r}
 # Figure S4: Incumbent Support by Local Unemployment (Weighted LOESS)
@@ -468,7 +464,7 @@ ggplot(df_rq2, aes(x = unemployment_rate, y = incumbent_win)) +
 
 This figure shows that counties with higher unemployment are generally less likely to support the incumbent presidential party, with the smooth trend line highlighting the overall downward relationship once extreme values are trimmed.
 
-### **Figure S5: Incumbent support vs unemployment, by county type** 
+### **Figure S5: Incumbent support vs unemployment, by county type**
 
 ```{r}
 # Figure S5: Incumbent Support, Unemployment, and County Type (Weighted LOESS)
@@ -515,4 +511,7 @@ Rosenstone, S. J. (1982). Economic adversity and voter turnout. \textit{American
 
 Schlozman, K. L., \& Verba, S. (1981). \textit{Injury to Insult: Unemployment, Class, and Political Response}. Harvard University Press.
 
+Almond, Gabriel A., and Sidney Verba. The Civic Culture: Political Attitudes and Democracy in Five Nations. Princeton University Pre
+
+Berelson, Bernard R., Paul F. Lazarsfeld, and William N. McPhee. Voting: A Study of Opinion Formation in a Presidential Campaign. University of Chicago Press, 1954
 \end{hangparas}
