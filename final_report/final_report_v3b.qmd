@@ -141,9 +141,11 @@ All technical specifications, modeling details, and diagnostics are deferred to 
 
 # Background and Motivation
 
-Economic conditions shape political behavior in multiple ways. Research suggests that economic adversity can suppress voter turnout, as individuals facing hardship may lack the time, resources, or attention to engage politically (Rosenstone, 1982; Schlozman & Verba, 1981). At the same time, voters often evaluate the incumbent party based on how well they believe the economy is performing, rewarding improvement and penalizing downturns—a pattern known as *retrospective economic voting* (Fiorina, 1981).
+Political theory suggests that populations differ in their typical level of political engagement. Almond and Verba’s classic “Civic Culture” framework describes a participation pyramid in which the largest group consists of disengaged citizens (“parochials”), followed by moderately involved voters (“subjects”), and finally a small group of highly engaged participants. In many systems, this bottom tier — often described as a “silent majority” — remains politically inactive unless economic or social conditions deteriorate. Under worsening economic conditions, previously uninvolved citizens may become mobilized to vote, either to punish the incumbent or express dissatisfaction with the status quo. This idea motivates our investigation of whether local economic downturns, measured through rising unemployment, affect the incumbent party’s electoral performance at the county level.\
+\
+Almond, Gabriel A., and Sidney Verba. *The Civic Culture: Political Attitudes and Democracy in Five Nations.* Princeton University Press, 1963
 
-Most research has focused on national-level trends, but economic conditions vary widely across places. This project examines whether *local* labor-market changes, specifically rising unemployment within a county, affect two outcomes at the county level: **voter turnout** and **support for the incumbent presidential party**. Understanding these local dynamics can help campaigns and policymakers anticipate how economic stress may influence electoral behavior across different types of communities.
+Berelson, Bernard R., Paul F. Lazarsfeld, and William N. McPhee. *Voting: A Study of Opinion Formation in a Presidential Campaign.* University of Chicago Press, 1954
 
 # Data Description
 
@@ -281,11 +283,21 @@ $$ \text{Turnout}_{it} = \beta_1 \text{Unemployment}_{it} + \beta_2 (\text{Unemp
 
 ### **RQ2: Economic Downturn and Incumbent Support**
 
-**Fixed-effects logistic regression:**\
+**Fixed-effects logistic regression:**
 
--   County FE absorb time-invariant political traits.
--   Year FE absorb national shocks (economy-wide trends, incumbency advantage cycles).
--   Identification relies on *within-county* changes.
+We focus only on **presidential election years** (2000–2020). For each county and election, we identify:
+
+-   which party won the county (Democrat or Republican),
+
+-   which party held the presidency in that year, and
+
+-   whether the county voted **for** the incumbent party.
+
+We examine how changes in local unemployment relate to the likelihood that a county supports the incumbent presidential party. To do this fairly, we compare each county **to itself over time**, rather than comparing counties to one another. This helps account for stable differences across places—such as long-term political leanings or demographic makeup—that could otherwise bias the results.
+
+We estimate a model that looks at how support for the incumbent changes in years when unemployment in a county is higher or lower than usual. We also account for national factors—such as political climate, incumbent popularity, or major economic events—that affect all counties in the same election year.
+
+In simple terms, this model tells us whether counties tend to **punish or reward** the incumbent party when their own local economic conditions worsen.
 
 \newpage
 
@@ -321,6 +333,51 @@ stargazer(model_full,
           notes.append = TRUE,
           header = FALSE)
 ```
+
+### **Table 2: Effect of Unemployment on Incumbent Support (RQ2)**
+
+```{r}
+library(kableExtra)
+
+# Fit model
+model_rq2 <- fixest::feglm(
+  incumbent_win ~ unemployment_rate | FIPS + YEAR,
+  family = "binomial",
+  data = df_rq2,
+  vcov = ~ FIPS
+)
+
+# Extract components
+beta <- coef(model_rq2)["unemployment_rate"]
+se   <- sqrt(diag(vcov(model_rq2)))["unemployment_rate"]
+z    <- beta / se
+p    <- 2 * pnorm(abs(z), lower.tail = FALSE)
+odds <- exp(beta)
+
+coef_tbl <- data.frame(
+  Term        = "Unemployment Rate",
+  Estimate    = sprintf("%.3f", beta),
+  Std.Error   = sprintf("%.3f", se),
+  z.value     = sprintf("%.3f", z),
+  p.value     = sprintf("%.3f", p),
+  Odds.Ratio  = sprintf("%.3f", odds)
+)
+
+kable(
+  coef_tbl,
+  caption = "Effect of Local Unemployment on Support for the Incumbent Party (Fixed-Effects Logistic Model)",
+  booktabs = TRUE,
+  align = "lccccc"
+) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    full_width = FALSE
+  )
+
+
+```
+
+This model includes county fixed effects and election-year fixed effects, which control for differences across counties and for national conditions that affect all counties in the same year. Because these factors are controlled for in the background, unemployment is the only predictor the model estimates directly and the only variable that appears in the table. **Interpretation:** A one-percentage-point increase in unemployment reduces the odds that the incumbent party wins the county by about 9%, holding county characteristics and national election conditions constant.
 
 \newpage
 
@@ -379,6 +436,68 @@ ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT,
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
 ```
+
+### **Figure S4: Incumbent support vs local unemployment **
+
+```{r}
+# Figure S4: Incumbent Support by Local Unemployment (Weighted LOESS)
+
+ggplot(df_rq2, aes(x = unemployment_rate, y = incumbent_win)) +
+  geom_jitter(alpha = 0.1, width = 0.15, height = 0.02) +
+  geom_smooth(
+    method = "loess",
+    se = TRUE,
+    aes(weight = CVAP),
+    size = 1,
+    color = "#1f78b4"
+  ) +
+  coord_cartesian(xlim = c(0, 15)) +
+  scale_y_continuous(limits = c(0, 1),
+                     breaks = seq(0, 1, 0.2),
+                     name = "Share voting for incumbent (0–1)") +
+  scale_x_continuous(name = "Local unemployment rate (%)") +
+  labs(
+    title = "Incumbent Support by Local Unemployment",
+    subtitle = "Population-weighted outcomes with smoothed trend (trimmed to realistic unemployment range)"
+  ) +
+  theme_minimal(base_size = 12)
+
+
+
+```
+
+This figure shows that counties with higher unemployment are generally less likely to support the incumbent presidential party, with the smooth trend line highlighting the overall downward relationship once extreme values are trimmed.
+
+### **Figure S5: Incumbent support vs unemployment, by county type **
+
+```{r}
+# Figure S5: Incumbent Support, Unemployment, and County Type (Weighted LOESS)
+
+ggplot(df_rq2, aes(x = unemployment_rate, y = incumbent_win)) +
+  geom_jitter(alpha = 0.10, width = 0.15, height = 0.02) +
+  geom_smooth(
+    method = "loess",
+    se = TRUE,
+    aes(weight = CVAP),
+    size = 1,
+    color = "#1f78b4"
+  ) +
+  facet_wrap(~ urbanicity, nrow = 1) +
+  coord_cartesian(xlim = c(0, 15)) +
+  scale_y_continuous(limits = c(0, 1),
+                     breaks = seq(0, 1, 0.2),
+                     name = "Share voting for incumbent (0–1)") +
+  scale_x_continuous(name = "Local unemployment rate (%)") +
+  labs(
+    title = "Incumbent Support, Unemployment, and County Type",
+    subtitle = "Population-weighted LOESS trends across county types (trimmed to realistic unemployment range)"
+  ) +
+  theme_minimal(base_size = 12)
+
+
+```
+
+Across rural, suburban, and urban areas, higher unemployment is consistently linked to lower incumbent support, though the strength and shape of the relationship differ across county types, reflecting the distinct political and economic contexts of each.
 
 \newpage
 
