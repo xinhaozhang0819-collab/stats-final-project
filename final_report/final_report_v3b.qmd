@@ -1,6 +1,6 @@
 ---
 title: "Economic Downturn, Turnout, and Incumbent Support"
-subtitle: "Final Report – STA 702 Statistical Analysis Project"
+subtitle: "Final Report – IDS 702 Statistical Analysis Project"
 author: "Diwas Purin, Tony Ngari, Tea Tafaj, Xinhao Zhang"
 date: today
 format: 
@@ -8,6 +8,9 @@ format:
     documentclass: article
     geometry: margin=1in
     fontsize: 11pt
+    include-in-header:
+      text: |
+        \usepackage{hanging}
 editor: visual
 execute:
   echo: false
@@ -110,8 +113,7 @@ df_rq2 <- df %>%
 
 # Executive Summary
 
-Local economic conditions influence both *who votes* and *which party voters support*, but in very different ways.\
-Using county-level data from 2000–2022, we examine how changes in unemployment relate to **voter turnout** and **support for the incumbent presidential party**.
+Local economic conditions influence both *who votes* and *which party voters support*, but in very different ways. Using county-level data from 2000–2022, we examine how changes in unemployment relate to **voter turnout** and **support for the incumbent presidential party**.
 
 \
 Across election cycles, turnout is shaped primarily by election type and stable county characteristics. Local economic downturns have only a weak and modest effect: when unemployment rises within a county, turnout increases slightly, but the change is small. Rural, suburban, and urban counties show different patterns, yet the practical impact of unemployment on participation remains limited.
@@ -139,13 +141,13 @@ All technical specifications, modeling details, and diagnostics are deferred to 
 
 # Background and Motivation
 
-Economic conditions shape political behavior in multiple ways. When local economies weaken, some voters who typically participate inconsistently may become more engaged, either to express dissatisfaction or to influence change. At the same time, voters often evaluate the incumbent party based on how well they believe the economy is performing, rewarding improvement and penalizing downturns.
+Economic conditions shape political behavior in multiple ways. Research suggests that economic adversity can suppress voter turnout, as individuals facing hardship may lack the time, resources, or attention to engage politically (Rosenstone, 1982; Schlozman & Verba, 1981). At the same time, voters often evaluate the incumbent party based on how well they believe the economy is performing, rewarding improvement and penalizing downturns—a pattern known as *retrospective economic voting* (Fiorina, 1981).
 
 Most research has focused on national-level trends, but economic conditions vary widely across places. This project examines whether *local* labor-market changes, specifically rising unemployment within a county, affect two outcomes at the county level: **voter turnout** and **support for the incumbent presidential party**. Understanding these local dynamics can help campaigns and policymakers anticipate how economic stress may influence electoral behavior across different types of communities.
 
 # Data Description
 
-Our analysis uses a county-level dataset combining data from the **Inter-university Consortium for Political and Social Research (ICPSR)** and the **Bureau of Labor Statistics (BLS)**:
+Our analysis uses a county-level dataset combining data from the **National Neighborhood Data Archive (NaNDA)** (Clary et al., 2024) and the **Bureau of Labor Statistics Local Area Unemployment Statistics (LAUS)** (BLS, 2024):
 
 -   **General election turnout** for all U.S. counties from 2004–2022.
 -   **Presidential election results**, used to determine whether the incumbent party carried each county.
@@ -377,3 +379,21 @@ ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT,
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
 ```
+
+\newpage
+
+# References
+
+\begin{hangparas}{0.5in}{1}
+
+Bureau of Labor Statistics. (2024). \textit{Local Area Unemployment Statistics (LAUS)}. U.S. Department of Labor. https://www.bls.gov/lau/
+
+Clary, W., Gomez-Lopez, I. N., Chenoweth, M., Gypin, L., Clarke, P., Noppert, G., Li, M., \& Kollman, K. (2024). \textit{National Neighborhood Data Archive (NaNDA): Voter Registration, Turnout, and Partisanship by County, United States, 2004-2022} (ICPSR 38506, Version 2). Inter-university Consortium for Political and Social Research. https://doi.org/10.3886/ICPSR38506.v2
+
+Fiorina, M. P. (1981). \textit{Retrospective Voting in American National Elections}. Yale University Press.
+
+Rosenstone, S. J. (1982). Economic adversity and voter turnout. \textit{American Journal of Political Science}, \textit{26}(1), 25--46. https://doi.org/10.2307/2110837
+
+Schlozman, K. L., \& Verba, S. (1981). \textit{Injury to Insult: Unemployment, Class, and Political Response}. Harvard University Press.
+
+\end{hangparas}
