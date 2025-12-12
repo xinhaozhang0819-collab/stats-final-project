@@ -224,8 +224,6 @@ We construct a county–year panel dataset by merging turnout, presidential elec
     -   **Turnout analysis (RQ1):** 2004–2022
     -   **Incumbent support (RQ2):** Presidential elections in 2000, 2004, 2008, 2012, 2016, 2020
 
-\newpage
-
 ## 2. Variable Definitions
 
 -   **Voter Turnout Rate:** The proportion of the citizen voting-age population (CVAP) that cast a ballot.
@@ -246,8 +244,6 @@ We construct a county–year panel dataset by merging turnout, presidential elec
 
 -   `FIPS`: County identifier for fixed effects.
 
-\newpage
-
 ## 3. Cleaning and Processing Workflow
 
 1.  Import data and harmonize county-level identifiers.\
@@ -259,8 +255,6 @@ We construct a county–year panel dataset by merging turnout, presidential elec
     -   Only presidential elections for RQ2\
 6.  Handle missing/unreliable entries (NA removal, turnout = 0).\
 7.  Convert categorical variables to factors required for FE models.
-
-\newpage
 
 ## 4. Modeling Procedures
 
@@ -294,8 +288,6 @@ We examine how changes in local unemployment relate to the likelihood that a cou
 We estimate a model that looks at how support for the incumbent changes in years when unemployment in a county is higher or lower than usual. We also account for national factors—such as political climate, incumbent popularity, or major economic events—that affect all counties in the same election year.
 
 In simple terms, this model tells us whether counties tend to **punish or reward** the incumbent party when their own local economic conditions worsen.
-
-\newpage
 
 ## 5. Regression Tables
 
@@ -374,8 +366,6 @@ kable(
 ```
 
 This model includes county fixed effects and election-year fixed effects, which control for differences across counties and for national conditions that affect all counties in the same year. Because these factors are controlled for in the background, unemployment is the only predictor the model estimates directly and the only variable that appears in the table. **Interpretation:** A one-percentage-point increase in unemployment reduces the odds that the incumbent party wins the county by about 9%, holding county characteristics and national election conditions constant.
-
-\newpage
 
 ## 6. Supplementary Figures
 
