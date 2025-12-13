@@ -370,7 +370,7 @@ This model includes county fixed effects and election-year fixed effects, which 
 
 ### Figure S1: Turnout Trends by Election Type
 
-```{r plot-by-election, fig.cap="Turnout is driven more by election cycle than economic conditions."}
+```{r}
 ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT, 
                color = election_type)) +
   geom_point(alpha = 0.1, size = 1) +
@@ -387,9 +387,11 @@ ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT,
   theme(legend.position = "bottom")
 ```
 
+The graph shows that Turnout is driven more by election cycle than economic conditions.
+
 ### Figure S2: Distribution of Turnout by Economic Condition
 
-```{r plot-boxplot, fig.cap="Turnout distributions are stable across economic tiers."}
+```{r fig.height=3.5, fig.width=7}
 ggplot(df_rq1, aes(x = county_type, y = VOTER_TURNOUT_PCT, fill = unemployment_tier)) +
   geom_boxplot(alpha = 0.8, outlier.size = 0.5) +
   scale_fill_viridis_d(option = "D", begin = 0.2, end = 0.8, name = "Unemployment Tier") +
@@ -403,9 +405,11 @@ ggplot(df_rq1, aes(x = county_type, y = VOTER_TURNOUT_PCT, fill = unemployment_t
   theme(legend.position = "bottom")
 ```
 
+The graph indicates that Turnout distributions are stable across economic tiers.
+
 ### Figure S3: Unemployment vs Turnout by County Type
 
-```{r plot-interaction, fig.cap="Interaction Effect: The relationship between unemployment and turnout varies by county type."}
+```{r fig.height=3.5, fig.width=7}
 ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT, 
                color = county_type)) +
   geom_point(alpha = 0.1, size = 0.8) +
@@ -422,9 +426,11 @@ ggplot(df_rq1, aes(x = unemployment_rate, y = VOTER_TURNOUT_PCT,
   theme(legend.position = "bottom")
 ```
 
+This figure indicates the interaction effect: the relationship between unemployment and turnout varies by county type.
+
 ### **Figure S4: Incumbent support vs local unemployment**
 
-```{r}
+```{r fig.height=3.5, fig.width=7}
 # Figure S4: Incumbent Support by Local Unemployment (Weighted LOESS)
 
 ggplot(df_rq2, aes(x = unemployment_rate, y = incumbent_win)) +
@@ -455,7 +461,7 @@ This figure shows that counties with higher unemployment are generally less like
 
 ### **Figure S5: Incumbent support vs unemployment, by county type**
 
-```{r}
+```{r fig.height=3.5, fig.width=7}
 # Figure S5: Incumbent Support, Unemployment, and County Type (Weighted LOESS)
 
 ggplot(df_rq2, aes(x = unemployment_rate, y = incumbent_win)) +
